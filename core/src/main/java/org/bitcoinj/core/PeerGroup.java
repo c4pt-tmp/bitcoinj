@@ -144,6 +144,10 @@ public class PeerGroup implements TransactionBroadcaster {
     // How many connections we want to have open at the current time. If we lose connections, we'll try opening more
     // until we reach this count.
     @GuardedBy("lock") private int maxConnections;
+    // if true, we will listen to "addr" network messages and add nodes discovered this way.
+    // if false, only nodes found by discovery process are used/added.
+    @GuardedBy("lock")
+    private boolean addPeersFromAddressMessage = true;
     // Minimum protocol version we will allow ourselves to connect to: require Bloom filtering.
     private volatile int vMinRequiredProtocolVersion;
 
@@ -157,6 +161,13 @@ public class PeerGroup implements TransactionBroadcaster {
     @GuardedBy("lock") private long fastCatchupTimeSecs;
     private final CopyOnWriteArrayList<Wallet> wallets;
     private final CopyOnWriteArrayList<PeerFilterProvider> peerFilterProviders;
+
+    // Give the client the option to disable HttpSeeds
+    private static boolean ignoreHttpSeeds;
+
+    public static void setIgnoreHttpSeeds(boolean ignoreHttpSeeds) {
+        PeerGroup.ignoreHttpSeeds = ignoreHttpSeeds;
+    }
 
     // This event listener is added to every peer. It's here so when we announce transactions via an "inv", every
     // peer can fetch them.
@@ -188,6 +199,7 @@ public class PeerGroup implements TransactionBroadcaster {
             onCoinsReceivedOrSent(wallet, tx);
         }
     };
+
 
     private void onCoinsReceivedOrSent(Wallet wallet, Transaction tx) {
         // We received a relevant transaction. We MAY need to recalculate and resend the Bloom filter, but only
@@ -259,7 +271,7 @@ public class PeerGroup implements TransactionBroadcaster {
         }
     }
 
-    private class PeerStartupListener implements PeerConnectedEventListener, PeerDisconnectedEventListener {
+    private class PeerStartupListener implements PeerConnectedEventListener, PeerDisconnectedEventListener, PreMessageReceivedEventListener {
         @Override
         public void onPeerConnected(Peer peer, int peerCount) {
             handleNewPeer(peer);
@@ -269,6 +281,19 @@ public class PeerGroup implements TransactionBroadcaster {
         public void onPeerDisconnected(Peer peer, int peerCount) {
             // The channel will be automatically removed from channels.
             handlePeerDeath(peer, null);
+        }
+
+        @Override
+        public Message onPreMessageReceived(Peer peer, Message m) {
+            // See https://github.com/bisq-network/bitcoinj/issues/28 for more info on addr msg handling
+            if (m instanceof AddressMessage && addPeersFromAddressMessage) {
+                for( PeerAddress peerAddress : ((AddressMessage)m).getAddresses() ) {
+                    addInactive(peerAddress, 0);
+                }
+            }
+
+            // Just pass the message right through for further processing.
+            return m;
         }
     }
 
@@ -429,6 +454,20 @@ public class PeerGroup implements TransactionBroadcaster {
     }
 
     /**
+     * Switch for enabling network peer discovery.
+     *   if true, we will listen to "addr" network messages and add nodes discovered this way.
+     *   if false, only nodes found by discovery process are used/added.
+     */
+    public void setAddPeersFromAddressMessage(boolean addPeersFromAddressMessage) {
+        lock.lock();
+        try {
+            this.addPeersFromAddressMessage = addPeersFromAddressMessage;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
      * Configure download of pending transaction dependencies. A change of values only takes effect for newly connected
      * peers.
      */
@@ -523,7 +562,12 @@ public class PeerGroup implements TransactionBroadcaster {
                     executor.schedule(this, delay, TimeUnit.MILLISECONDS);
                     return;
                 }
-                connectTo(addrToTry, false, vConnectTimeoutMillis);
+
+                // BitcoinJ gets too many connections after a connection loss and reconnect as it adds up a lot of
+                // potential candidates and then try to connect to all of those when getting connection again.
+                // A check for maxConnections is required to not exceed connections.
+                if (countConnectedAndPendingPeers() < getMaxConnections())
+                    connectTo(addrToTry, false, vConnectTimeoutMillis);
             } finally {
                 lock.unlock();
             }
@@ -903,12 +947,20 @@ public class PeerGroup implements TransactionBroadcaster {
         lock.lock();
         try {
             // Deduplicate
-            if (backoffMap.containsKey(peerAddress))
+            boolean backoffMapContainsPeerAddress = false;
+            for (PeerAddress a : backoffMap.keySet()) {
+                if (a.equalsIgnoringMetadata(peerAddress)) {
+                    backoffMapContainsPeerAddress = true;
+                    break;
+                }
+            }
+            if (backoffMapContainsPeerAddress)
                 return false;
             backoffMap.put(peerAddress, new ExponentialBackoff(peerBackoffParams));
             if (priority != 0)
                 priorityMap.put(peerAddress, priority);
             inactives.offer(peerAddress);
+
             return true;
         } finally {
             lock.unlock();
@@ -930,7 +982,7 @@ public class PeerGroup implements TransactionBroadcaster {
         try {
             this.requiredServices = requiredServices;
             peerDiscoverers.clear();
-            addPeerDiscovery(MultiplexingDiscovery.forServices(params, requiredServices));
+            addPeerDiscovery(MultiplexingDiscovery.forServices(params, requiredServices, ignoreHttpSeeds));
         } finally {
             lock.unlock();
         }
@@ -995,8 +1047,7 @@ public class PeerGroup implements TransactionBroadcaster {
             }
         }
         watch.stop();
-        log.info("Peer discovery took {} and returned {} items from {} discoverers", watch, addressList.size(),
-                peerDiscoverers.size());
+        log.info("Peer discovery took {} and returned {} items", watch, addressList.size());
         return addressList.size();
     }
 
@@ -1031,6 +1082,10 @@ public class PeerGroup implements TransactionBroadcaster {
                 socket = new Socket();
                 socket.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), params.getPort()), vConnectTimeoutMillis);
                 localhostCheckState = LocalhostCheckState.FOUND;
+
+                // If we are connected to localhost we don't want to get other peers added from AddressMessage calls.
+                setAddPeersFromAddressMessage(false);
+
                 return true;
             } catch (IOException e) {
                 log.info("Localhost peer not detected.");
@@ -1716,7 +1771,16 @@ public class PeerGroup implements TransactionBroadcaster {
             } else {
                 backoffMap.get(address).trackFailure();
                 // Put back on inactive list
-                inactives.offer(address);
+                boolean inactiveContainsAddress = false;
+                for (PeerAddress a : inactives) {
+                    if (a.equalsIgnoringMetadata(address)) {
+                        inactiveContainsAddress = true;
+                        break;
+                    }
+                }
+                if (!inactiveContainsAddress) {
+                    inactives.offer(address);
+                }
             }
 
             if (numPeers < getMaxConnections()) {
@@ -1785,7 +1849,7 @@ public class PeerGroup implements TransactionBroadcaster {
 
         // If we take more stalls than this, we assume we're on some kind of terminally slow network and the
         // stall threshold just isn't set properly. We give up on stall disconnects after that.
-        private int maxStalls = 3;
+        private int maxStalls = 10;
 
         // How many seconds the peer has until we start measuring its speed.
         private int warmupSeconds = -1;
@@ -1867,6 +1931,18 @@ public class PeerGroup implements TransactionBroadcaster {
                             bytesInLastSecond / 1024.0, chainHeight, mostCommonChainHeight);
                     String thresholdString = String.format(Locale.US, "(threshold <%.2f KB/sec for %d seconds)",
                             minSpeedBytesPerSec / 1024.0, samples.length);
+                    double txnsPercentage = (double) txnsInLastSecond / (double) origTxnsInLastSecond;
+                    if (txnsInLastSecond > 1000 && txnsPercentage > 0.99) {
+                        // If bitcoin-core is sending more than 99% of the txs, disconnect the peer.
+                        Peer peer = getDownloadPeer();
+                        log.warn(String.format(Locale.US,
+                                "%d tx/sec is too high compared to %d pre-filtered tx/sec, disconnecting %s.",
+                                txnsInLastSecond, origTxnsInLastSecond, peer, maxStalls));
+                        peer.close();
+                        // Reset the sample buffer and give the next peer time to get going.
+                        samples = null;
+                        warmupSeconds = period;
+                    }
                     if (maxStalls <= 0) {
                         log.info(statsString + ", stall disabled " + thresholdString);
                     } else if (warmupSeconds > 0) {
