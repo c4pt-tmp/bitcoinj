@@ -19,6 +19,8 @@ package org.bitcoinj.crypto;
 import java.util.List;
 import java.util.Locale;
 
+import com.google.common.primitives.Ints;
+
 /**
  * <p>This is just a wrapper for the i (child number) as per BIP 32 with a boolean getter for the most significant bit
  * and a getter for the actual 0-based child number. A {@link List} of these forms a <i>path</i> through a
@@ -93,6 +95,6 @@ public class ChildNumber implements Comparable<ChildNumber> {
     @Override
     public int compareTo(ChildNumber other) {
         // note that in this implementation compareTo() is not consistent with equals()
-        return Integer.compare(this.num(), other.num());
+        return Ints.compare(this.num(), other.num());
     }
 }

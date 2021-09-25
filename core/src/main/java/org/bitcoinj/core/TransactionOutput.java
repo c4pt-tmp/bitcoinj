@@ -17,6 +17,7 @@
 
 package org.bitcoinj.core;
 
+import com.google.common.base.Objects;
 import org.bitcoinj.script.*;
 import org.bitcoinj.wallet.Wallet;
 import org.slf4j.*;
@@ -25,7 +26,6 @@ import javax.annotation.*;
 import java.io.*;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 import static com.google.common.base.Preconditions.*;
 
@@ -54,6 +54,8 @@ public class TransactionOutput extends ChildMessage {
     // us and used in one of our own transactions (eg, because it is a change output).
     private boolean availableForSpending;
     @Nullable private TransactionInput spentBy;
+
+    private int scriptLen;
 
     /**
      * Deserializes a transaction output message. This is usually part of a transaction message.
@@ -137,7 +139,7 @@ public class TransactionOutput extends ChildMessage {
     @Override
     protected void parse() throws ProtocolException {
         value = readInt64();
-        int scriptLen = readVarInt().intValue();
+        scriptLen = (int) readVarInt();
         length = cursor - offset + scriptLen;
         scriptBytes = readBytes(scriptLen);
     }
@@ -156,7 +158,11 @@ public class TransactionOutput extends ChildMessage {
      * receives.
      */
     public Coin getValue() {
-        return Coin.valueOf(value);
+        try {
+            return Coin.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
     }
 
     /**
@@ -193,7 +199,10 @@ public class TransactionOutput extends ChildMessage {
 
     /**
      * <p>Gets the minimum value for a txout of this size to be considered non-dust by Bitcoin Core
-     * (and thus relayed). See: CTxOut::IsDust() in Bitcoin Core.</p>
+     * (and thus relayed). See: CTxOut::IsDust() in Bitcoin Core. The assumption is that any output that would
+     * consume more than a third of its value in fees is not something the Bitcoin system wants to deal with right now,
+     * so we call them "dust outputs" and they're made non standard. The choice of one third is somewhat arbitrary and
+     * may change in future.</p>
      *
      * <p>You probably should use {@link TransactionOutput#getMinNonDustValue()} which uses
      * a safe fee-per-kb by default.</p>
@@ -201,34 +210,19 @@ public class TransactionOutput extends ChildMessage {
      * @param feePerKb The fee required per kilobyte. Note that this is the same as Bitcoin Core's -minrelaytxfee * 3
      */
     public Coin getMinNonDustValue(Coin feePerKb) {
-        // "Dust" is defined in terms of dustRelayFee,
-        // which has units satoshis-per-kilobyte.
-        // If you'd pay more in fees than the value of the output
-        // to spend something, then we consider it dust.
-        // A typical spendable non-segwit txout is 34 bytes big, and will
-        // need a CTxIn of at least 148 bytes to spend:
-        // so dust is a spendable txout less than
-        // 182*dustRelayFee/1000 (in satoshis).
-        // 546 satoshis at the default rate of 3000 sat/kB.
-        // A typical spendable segwit txout is 31 bytes big, and will
-        // need a CTxIn of at least 67 bytes to spend:
-        // so dust is a spendable txout less than
-        // 98*dustRelayFee/1000 (in satoshis).
-        // 294 satoshis at the default rate of 3000 sat/kB.
-        long size = this.unsafeBitcoinSerialize().length;
-        final Script script = getScriptPubKey();
-        if (ScriptPattern.isP2PKH(script) || ScriptPattern.isP2PK(script) || ScriptPattern.isP2SH(script))
-            size += 32 + 4 + 1 + 107 + 4; // 148
-        else if (ScriptPattern.isP2WH(script))
-            size += 32 + 4 + 1 + (107 / 4) + 4; // 68
-        else
-            return Coin.ZERO;
+        // A typical output is 33 bytes (pubkey hash + opcodes) and requires an input of 148 bytes to spend so we add
+        // that together to find out the total amount of data used to transfer this amount of value. Note that this
+        // formula is wrong for anything that's not a P2PKH output, unfortunately, we must follow Bitcoin Core's
+        // wrongness in order to ensure we're considered standard. A better formula would either estimate the
+        // size of data needed to satisfy all different script types, or just hard code 33 below.
+        final long size = this.unsafeBitcoinSerialize().length + 148;
         return feePerKb.multiply(size).divide(1000);
     }
 
     /**
      * Returns the minimum value for this output to be considered "not dust", i.e. the transaction will be relayable
-     * and mined by default miners.
+     * and mined by default miners. For normal pay to address outputs, this is 2730 satoshis, the same as
+     * {@link Transaction#MIN_NONDUST_OUTPUT}.
      */
     public Coin getMinNonDustValue() {
         return getMinNonDustValue(Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.multiply(3));
@@ -417,6 +411,6 @@ public class TransactionOutput extends ChildMessage {
 
     @Override
     public int hashCode() {
-        return Objects.hash(value, parent, Arrays.hashCode(scriptBytes));
+        return Objects.hashCode(value, parent, Arrays.hashCode(scriptBytes));
     }
 }

@@ -317,9 +317,8 @@ public class TransactionConfidence {
      * Returns a snapshot of {@link PeerAddress}es that announced the transaction.
      */
     public Set<PeerAddress> getBroadcastBy() {
-        Set<PeerAddress> broadcastBySet = new HashSet<>();
-        Iterators.addAll(broadcastBySet, broadcastBy.listIterator());
-        return broadcastBySet;
+        ListIterator<PeerAddress> iterator = broadcastBy.listIterator();
+        return Sets.newHashSet(iterator);
     }
 
     /** Returns true if the given address has been seen via markBroadcastBy() */

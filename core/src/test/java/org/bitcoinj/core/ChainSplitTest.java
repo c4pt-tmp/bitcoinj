@@ -20,7 +20,6 @@ package org.bitcoinj.core;
 import org.bitcoinj.core.listeners.TransactionConfidenceEventListener;
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType;
 import org.bitcoinj.params.UnitTestParams;
-import org.bitcoinj.script.Script;
 import org.bitcoinj.store.MemoryBlockStore;
 import org.bitcoinj.testing.FakeTxBuilder;
 import org.bitcoinj.utils.BriefLogFormatter;
@@ -62,7 +61,7 @@ public class ChainSplitTest {
         Utils.setMockClock(); // Use mock clock
         Context.propagate(new Context(UNITTEST, 100, Coin.ZERO, false));
         MemoryBlockStore blockStore = new MemoryBlockStore(UNITTEST);
-        wallet = Wallet.createDeterministic(UNITTEST, Script.ScriptType.P2PKH);
+        wallet = new Wallet(UNITTEST);
         ECKey key1 = wallet.freshReceiveKey();
         ECKey key2 = wallet.freshReceiveKey();
         chain = new BlockChain(UNITTEST, wallet, blockStore);
@@ -526,13 +525,14 @@ public class ChainSplitTest {
 
         // Receive some money to the wallet.
         Transaction t1 = FakeTxBuilder.createFakeTx(UNITTEST, COIN, coinsTo);
-        final Block b1 = FakeTxBuilder.makeSolvedTestBlock(UNITTEST.getGenesisBlock(), t1);
+        final Block b1 = FakeTxBuilder.makeSolvedTestBlock(UNITTEST.genesisBlock, t1);
         chain.add(b1);
 
         // Send a couple of payments one after the other (so the second depends on the change output of the first).
-        Transaction t2 = checkNotNull(wallet.createSend(LegacyAddress.fromKey(UNITTEST, new ECKey()), CENT, true));
+        wallet.allowSpendingUnconfirmedTransactions();
+        Transaction t2 = checkNotNull(wallet.createSend(LegacyAddress.fromKey(UNITTEST, new ECKey()), CENT));
         wallet.commitTx(t2);
-        Transaction t3 = checkNotNull(wallet.createSend(LegacyAddress.fromKey(UNITTEST, new ECKey()), CENT, true));
+        Transaction t3 = checkNotNull(wallet.createSend(LegacyAddress.fromKey(UNITTEST, new ECKey()), CENT));
         wallet.commitTx(t3);
         chain.add(FakeTxBuilder.makeSolvedTestBlock(b1, t2, t3));
 

@@ -21,6 +21,8 @@ import org.bitcoinj.core.*;
 import org.bitcoinj.script.Script;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableList;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.math.ec.ECPoint;
 
@@ -29,8 +31,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
 
 import static org.bitcoinj.core.Utils.HEX;
 import static com.google.common.base.Preconditions.*;
@@ -54,7 +54,7 @@ public class DeterministicKey extends ECKey {
     };
 
     private final DeterministicKey parent;
-    private final HDPath childNumberPath;
+    private final ImmutableList<ChildNumber> childNumberPath;
     private final int depth;
     private int parentFingerprint; // 0 if this key is root node of key hierarchy
 
@@ -62,7 +62,7 @@ public class DeterministicKey extends ECKey {
     private final byte[] chainCode;
 
     /** Constructs a key from its components. This is not normally something you should use. */
-    public DeterministicKey(List<ChildNumber> childNumberPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             LazyECPoint publicAsPoint,
                             @Nullable BigInteger priv,
@@ -70,13 +70,13 @@ public class DeterministicKey extends ECKey {
         super(priv, compressPoint(checkNotNull(publicAsPoint)));
         checkArgument(chainCode.length == 32);
         this.parent = parent;
-        this.childNumberPath = HDPath.M(checkNotNull(childNumberPath));
+        this.childNumberPath = checkNotNull(childNumberPath);
         this.chainCode = Arrays.copyOf(chainCode, chainCode.length);
         this.depth = parent == null ? 0 : parent.depth + 1;
         this.parentFingerprint = (parent != null) ? parent.getFingerprint() : 0;
     }
 
-    public DeterministicKey(List<ChildNumber> childNumberPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             ECPoint publicAsPoint,
                             boolean compressed,
@@ -86,21 +86,21 @@ public class DeterministicKey extends ECKey {
     }
 
     /** Constructs a key from its components. This is not normally something you should use. */
-    public DeterministicKey(HDPath hdPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             BigInteger priv,
                             @Nullable DeterministicKey parent) {
         super(priv, ECKey.publicPointFromPrivate(priv), true);
         checkArgument(chainCode.length == 32);
         this.parent = parent;
-        this.childNumberPath = checkNotNull(hdPath);
+        this.childNumberPath = checkNotNull(childNumberPath);
         this.chainCode = Arrays.copyOf(chainCode, chainCode.length);
         this.depth = parent == null ? 0 : parent.depth + 1;
         this.parentFingerprint = (parent != null) ? parent.getFingerprint() : 0;
     }
 
     /** Constructs a key from its components. This is not normally something you should use. */
-    public DeterministicKey(List<ChildNumber> childNumberPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             KeyCrypter crypter,
                             LazyECPoint pub,
@@ -132,7 +132,7 @@ public class DeterministicKey extends ECKey {
      * information about its parent key.  Invoked when deserializing, but otherwise not something that
      * you normally should use.
      */
-    public DeterministicKey(List<ChildNumber> childNumberPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             LazyECPoint publicAsPoint,
                             @Nullable DeterministicKey parent,
@@ -141,7 +141,7 @@ public class DeterministicKey extends ECKey {
         super(null, compressPoint(checkNotNull(publicAsPoint)));
         checkArgument(chainCode.length == 32);
         this.parent = parent;
-        this.childNumberPath = HDPath.M(checkNotNull(childNumberPath));
+        this.childNumberPath = checkNotNull(childNumberPath);
         this.chainCode = Arrays.copyOf(chainCode, chainCode.length);
         this.depth = depth;
         this.parentFingerprint = ascertainParentFingerprint(parent, parentFingerprint);
@@ -152,7 +152,7 @@ public class DeterministicKey extends ECKey {
      * information about its parent key.  Invoked when deserializing, but otherwise not something that
      * you normally should use.
      */
-    public DeterministicKey(List<ChildNumber> childNumberPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             BigInteger priv,
                             @Nullable DeterministicKey parent,
@@ -161,7 +161,7 @@ public class DeterministicKey extends ECKey {
         super(priv, ECKey.publicPointFromPrivate(priv), true);
         checkArgument(chainCode.length == 32);
         this.parent = parent;
-        this.childNumberPath = HDPath.M(checkNotNull(childNumberPath));
+        this.childNumberPath = checkNotNull(childNumberPath);
         this.chainCode = Arrays.copyOf(chainCode, chainCode.length);
         this.depth = depth;
         this.parentFingerprint = ascertainParentFingerprint(parent, parentFingerprint);
@@ -184,15 +184,15 @@ public class DeterministicKey extends ECKey {
      * A path can be written as 0/1/0 which means the first child of the root, the second child of that node, then
      * the first child of that node.
      */
-    public HDPath getPath() {
+    public ImmutableList<ChildNumber> getPath() {
         return childNumberPath;
     }
 
     /**
-     * Returns the path of this key as a human readable string starting with M or m to indicate the master key.
+     * Returns the path of this key as a human readable string starting with M to indicate the master key.
      */
     public String getPathAsString() {
-        return getPath().toString();
+        return HDUtils.formatPath(getPath());
     }
 
     /**
@@ -437,7 +437,7 @@ public class DeterministicKey extends ECKey {
                 cursor.pub, new BigInteger(1, parentalPrivateKeyBytes), cursor.parent);
         // Now we have to rederive the keys along the path back to ourselves. That path can be found by just truncating
         // our path with the length of the parents path.
-        List<ChildNumber> path = childNumberPath.subList(cursor.getPath().size(), childNumberPath.size());
+        ImmutableList<ChildNumber> path = childNumberPath.subList(cursor.getPath().size(), childNumberPath.size());
         for (ChildNumber num : path) {
             downCursor = HDKeyDerivation.deriveChildKey(downCursor, num);
         }
@@ -553,13 +553,13 @@ public class DeterministicKey extends ECKey {
         final int parentFingerprint = buffer.getInt();
         final int i = buffer.getInt();
         final ChildNumber childNumber = new ChildNumber(i);
-        HDPath path;
+        ImmutableList<ChildNumber> path;
         if (parent != null) {
             if (parentFingerprint == 0)
                 throw new IllegalArgumentException("Parent was provided but this key doesn't have one");
             if (parent.getFingerprint() != parentFingerprint)
                 throw new IllegalArgumentException("Parent fingerprints don't match");
-            path = parent.getPath().extend(childNumber);
+            path = HDUtils.append(parent.getPath(), childNumber);
             if (path.size() != depth)
                 throw new IllegalArgumentException("Depth does not match");
         } else {
@@ -568,8 +568,8 @@ public class DeterministicKey extends ECKey {
                 // This can happen when deserializing an account key for a watching wallet.  In this case, we assume that
                 // the client wants to conceal the key's position in the hierarchy.  The path is truncated at the
                 // parent's node.
-                path = HDPath.M(childNumber);
-            else path = HDPath.M();
+                path = ImmutableList.of(childNumber);
+            else path = ImmutableList.of();
         }
         byte[] chainCode = new byte[32];
         buffer.get(chainCode);
@@ -618,12 +618,12 @@ public class DeterministicKey extends ECKey {
         DeterministicKey other = (DeterministicKey) o;
         return super.equals(other)
                 && Arrays.equals(this.chainCode, other.chainCode)
-                && Objects.equals(this.childNumberPath, other.childNumberPath);
+                && Objects.equal(this.childNumberPath, other.childNumberPath);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), Arrays.hashCode(chainCode), childNumberPath);
+        return Objects.hashCode(super.hashCode(), Arrays.hashCode(chainCode), childNumberPath);
     }
 
     @Override
@@ -632,10 +632,8 @@ public class DeterministicKey extends ECKey {
         helper.add("pub", Utils.HEX.encode(pub.getEncoded()));
         helper.add("chainCode", HEX.encode(chainCode));
         helper.add("path", getPathAsString());
-        if (parent != null)
-            helper.add("creationTimeSeconds", getCreationTimeSeconds() + " (inherited)");
-        else
-            helper.add("creationTimeSeconds", getCreationTimeSeconds());
+        if (creationTimeSeconds > 0)
+            helper.add("creationTimeSeconds", creationTimeSeconds);
         helper.add("isEncrypted", isEncrypted());
         helper.add("isPubKeyOnly", isPubKeyOnly());
         return helper.toString();

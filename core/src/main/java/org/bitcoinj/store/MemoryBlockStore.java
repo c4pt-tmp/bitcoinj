@@ -42,7 +42,9 @@ public class MemoryBlockStore implements BlockStore {
             put(storedGenesis);
             setChainHead(storedGenesis);
             this.params = params;
-        } catch (BlockStoreException | VerificationException e) {
+        } catch (BlockStoreException e) {
+            throw new RuntimeException(e);  // Cannot happen.
+        } catch (VerificationException e) {
             throw new RuntimeException(e);  // Cannot happen.
         }
     }

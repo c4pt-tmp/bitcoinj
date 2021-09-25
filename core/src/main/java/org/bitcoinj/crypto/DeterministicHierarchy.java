@@ -16,7 +16,9 @@
 
 package org.bitcoinj.crypto;
 
-import java.util.HashMap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,10 +41,10 @@ import static com.google.common.base.Preconditions.checkArgument;
  * is a list of {@link ChildNumber}s.</p>
  */
 public class DeterministicHierarchy {
-    private final Map<HDPath, DeterministicKey> keys = new HashMap<>();
-    private final HDPath rootPath;
+    private final Map<ImmutableList<ChildNumber>, DeterministicKey> keys = Maps.newHashMap();
+    private final ImmutableList<ChildNumber> rootPath;
     // Keep track of how many child keys each node has. This is kind of weak.
-    private final Map<HDPath, ChildNumber> lastChildNumbers = new HashMap<>();
+    private final Map<ImmutableList<ChildNumber>, ChildNumber> lastChildNumbers = Maps.newHashMap();
 
     public static final int BIP32_STANDARDISATION_TIME_SECS = 1369267200;
 
@@ -60,7 +62,7 @@ public class DeterministicHierarchy {
      * inserted in order.
      */
     public final void putKey(DeterministicKey key) {
-        HDPath path = key.getPath();
+        ImmutableList<ChildNumber> path = key.getPath();
         // Update our tracking of what the next child in each branch of the tree should be. Just assume that keys are
         // inserted in order here.
         final DeterministicKey parent = key.getParent();
@@ -79,14 +81,13 @@ public class DeterministicHierarchy {
      * @throws IllegalArgumentException if create is false and the path was not found.
      */
     public DeterministicKey get(List<ChildNumber> path, boolean relativePath, boolean create) {
-        HDPath inputPath = HDPath.M(path);
-        HDPath absolutePath = relativePath
-                ? rootPath.extend(path)
-                : inputPath;
+        ImmutableList<ChildNumber> absolutePath = relativePath
+                ? ImmutableList.<ChildNumber>builder().addAll(rootPath).addAll(path).build()
+                : ImmutableList.copyOf(path);
         if (!keys.containsKey(absolutePath)) {
             if (!create)
                 throw new IllegalArgumentException(String.format(Locale.US, "No key found for %s path %s.",
-                    relativePath ? "relative" : "absolute", inputPath.toString()));
+                    relativePath ? "relative" : "absolute", HDUtils.formatPath(path)));
             checkArgument(absolutePath.size() > 0, "Can't derive the master key: nothing to derive from.");
             DeterministicKey parent = get(absolutePath.subList(0, absolutePath.size() - 1), false, true);
             putKey(HDKeyDerivation.deriveChildKey(parent, absolutePath.get(absolutePath.size() - 1)));
@@ -102,10 +103,10 @@ public class DeterministicHierarchy {
      * @param relative whether the path is relative to the root path
      * @param createParent whether the parent corresponding to path should be created (with any necessary ancestors) if it doesn't exist already
      * @param privateDerivation whether to use private or public derivation
-     * @return next newly created key using the child derivation function
+     * @return next newly created key using the child derivation funtcion
      * @throws IllegalArgumentException if the parent doesn't exist and createParent is false.
      */
-    public DeterministicKey deriveNextChild(List<ChildNumber> parentPath, boolean relative, boolean createParent, boolean privateDerivation) {
+    public DeterministicKey deriveNextChild(ImmutableList<ChildNumber> parentPath, boolean relative, boolean createParent, boolean privateDerivation) {
         DeterministicKey parent = get(parentPath, relative, createParent);
         int nAttempts = 0;
         while (nAttempts++ < HDKeyDerivation.MAX_CHILD_DERIVATION_ATTEMPTS) {
@@ -117,14 +118,14 @@ public class DeterministicHierarchy {
         throw new HDDerivationException("Maximum number of child derivation attempts reached, this is probably an indication of a bug.");
     }
 
-    private ChildNumber getNextChildNumberToDerive(HDPath path, boolean privateDerivation) {
+    private ChildNumber getNextChildNumberToDerive(ImmutableList<ChildNumber> path, boolean privateDerivation) {
         ChildNumber lastChildNumber = lastChildNumbers.get(path);
         ChildNumber nextChildNumber = new ChildNumber(lastChildNumber != null ? lastChildNumber.num() + 1 : 0, privateDerivation);
         lastChildNumbers.put(path, nextChildNumber);
         return nextChildNumber;
     }
 
-    public int getNumChildren(HDPath path) {
+    public int getNumChildren(ImmutableList<ChildNumber> path) {
         final ChildNumber cn = lastChildNumbers.get(path);
         if (cn == null)
             return 0;

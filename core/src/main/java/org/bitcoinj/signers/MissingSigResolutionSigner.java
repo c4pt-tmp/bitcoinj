@@ -39,10 +39,9 @@ import org.slf4j.LoggerFactory;
 public class MissingSigResolutionSigner implements TransactionSigner {
     private static final Logger log = LoggerFactory.getLogger(MissingSigResolutionSigner.class);
 
-    private final Wallet.MissingSigsMode missingSigsMode;
+    public Wallet.MissingSigsMode missingSigsMode = Wallet.MissingSigsMode.USE_DUMMY_SIG;
 
     public MissingSigResolutionSigner() {
-        this(Wallet.MissingSigsMode.USE_DUMMY_SIG);
     }
 
     public MissingSigResolutionSigner(Wallet.MissingSigsMode missingSigsMode) {

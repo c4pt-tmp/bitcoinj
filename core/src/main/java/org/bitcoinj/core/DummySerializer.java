@@ -34,16 +34,6 @@ class DummySerializer extends MessageSerializer {
     }
 
     @Override
-    public DummySerializer withProtocolVersion(int protocolVersion) {
-        return this;
-    }
-
-    @Override
-    public int getProtocolVersion() {
-        return 0;
-    }
-
-    @Override
     public Message deserialize(ByteBuffer in) throws UnsupportedOperationException {
         throw new UnsupportedOperationException(DEFAULT_EXCEPTION_MESSAGE);
     }
@@ -64,12 +54,12 @@ class DummySerializer extends MessageSerializer {
     }
 
     @Override
-    public AddressV1Message makeAddressV1Message(byte[] payloadBytes, int length) throws UnsupportedOperationException {
+    public AddressMessage makeAddressMessage(byte[] payloadBytes, int length) throws UnsupportedOperationException {
         throw new UnsupportedOperationException(DEFAULT_EXCEPTION_MESSAGE);
     }
 
     @Override
-    public AddressV2Message makeAddressV2Message(byte[] payloadBytes, int length) throws UnsupportedOperationException {
+    public Message makeAlertMessage(byte[] payloadBytes) throws UnsupportedOperationException {
         throw new UnsupportedOperationException(DEFAULT_EXCEPTION_MESSAGE);
     }
 

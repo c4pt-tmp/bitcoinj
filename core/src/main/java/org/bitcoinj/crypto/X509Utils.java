@@ -89,7 +89,9 @@ public class X509Utils {
             KeyStore keystore = KeyStore.getInstance(keystoreType);
             keystore.load(is, keystorePassword != null ? keystorePassword.toCharArray() : null);
             return keystore;
-        } catch (IOException | GeneralSecurityException x) {
+        } catch (IOException x) {
+            throw new KeyStoreException(x);
+        } catch (GeneralSecurityException x) {
             throw new KeyStoreException(x);
         } finally {
             try {

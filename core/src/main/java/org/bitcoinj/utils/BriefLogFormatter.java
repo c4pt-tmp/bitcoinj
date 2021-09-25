@@ -32,10 +32,11 @@ public class BriefLogFormatter extends Formatter {
     // OpenJDK made a questionable, backwards incompatible change to the Logger implementation. It internally uses
     // weak references now which means simply fetching the logger and changing its configuration won't work. We must
     // keep a reference to our custom logger around.
-    private static final Logger logger = Logger.getLogger("");
+    private static Logger logger;
 
     /** Configures JDK logging to use this class for everything. */
     public static void init() {
+        logger = Logger.getLogger("");
         final Handler[] handlers = logger.getHandlers();
         // In regular Java there is always a handler. Avian doesn't install one however.
         if (handlers.length > 0)

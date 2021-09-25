@@ -17,11 +17,10 @@
 package org.bitcoinj.params;
 
 import org.bitcoinj.core.NetworkParameters;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -33,9 +32,9 @@ import java.util.Set;
  */
 public class Networks {
     /** Registered networks */
-    private static Set<NetworkParameters> networks = unmodifiableSet(TestNet3Params.get(), MainNetParams.get());
+    private static Set<? extends NetworkParameters> networks = ImmutableSet.of(TestNet3Params.get(), MainNetParams.get());
 
-    public static Set<NetworkParameters> get() {
+    public static Set<? extends NetworkParameters> get() {
         return networks;
     }
 
@@ -45,7 +44,7 @@ public class Networks {
      * @param network Network to register/add.
      */
     public static void register(NetworkParameters network) {
-        register(Collections.singleton(network));
+        register(Lists.newArrayList(network));
     }
 
     /**
@@ -54,8 +53,11 @@ public class Networks {
      *
      * @param networks Networks to register/add.
      */
-    public static void register(Collection<NetworkParameters> networks) {
-        Networks.networks = combinedSet(Networks.networks, networks);
+    public static void register(Collection<? extends NetworkParameters> networks) {
+        ImmutableSet.Builder<NetworkParameters> builder = ImmutableSet.builder();
+        builder.addAll(Networks.networks);
+        builder.addAll(networks);
+        Networks.networks = builder.build();
     }
 
     /**
@@ -64,25 +66,14 @@ public class Networks {
      * @param network Network type to unregister/remove.
      */
     public static void unregister(NetworkParameters network) {
-        Networks.networks = removeFromSet(networks, network);
-    }
-
-    // Create an unmodifiable set of NetworkParameters from an array/varargs
-    private static Set<NetworkParameters> unmodifiableSet(NetworkParameters... ts) {
-        return Collections.unmodifiableSet(new HashSet<>(Arrays.asList(ts)));
-    }
-
-    // Create an unmodifiable set by combining two collections
-    private static <T> Set<T> combinedSet(Collection<T> a, Collection<T> b) {
-        Set<T> tempSet = new HashSet<>(a);
-        tempSet.addAll(b);
-        return Collections.unmodifiableSet(tempSet);
-    }
-
-    // Create a new unmodifiable set by removing an item from an existing set
-    private static <T> Set<T> removeFromSet(Set<T> set, T item) {
-        Set<T> tempSet = new HashSet<>(set);
-        tempSet.remove(item);
-        return Collections.unmodifiableSet(tempSet);
+        if (networks.contains(network)) {
+            ImmutableSet.Builder<NetworkParameters> builder = ImmutableSet.builder();
+            for (NetworkParameters parameters : networks) {
+                if (parameters.equals(network))
+                    continue;
+                builder.add(parameters);
+            }
+            networks = builder.build();
+        }
     }
 }

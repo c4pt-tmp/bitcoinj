@@ -28,7 +28,6 @@ import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.utils.MonetaryFormat;
 import org.bitcoinj.core.VerificationException;
@@ -54,45 +53,26 @@ public abstract class AbstractBitcoinNetParams extends NetworkParameters {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractBitcoinNetParams.class);
 
-    /** lazy-initialized by the first call to {@link NetworkParameters#getGenesisBlock()} */
-    protected Block genesisBlock;
-
     public AbstractBitcoinNetParams() {
         super();
-        interval = INTERVAL;
-        subsidyDecreaseBlockCount = REWARD_HALVING_INTERVAL;
     }
 
     /**
      * Checks if we are at a reward halving point.
-     * @param previousHeight The height of the previous stored block
+     * @param height The height of the previous stored block
      * @return If this is a reward halving point
      */
-    public final boolean isRewardHalvingPoint(final int previousHeight) {
-        return ((previousHeight + 1) % REWARD_HALVING_INTERVAL) == 0;
-    }
-
-    /**
-     * <p>A utility method that calculates how much new Bitcoin would be created by the block at the given height.
-     * The inflation of Bitcoin is predictable and drops roughly every 4 years (210,000 blocks). At the dawn of
-     * the system it was 50 coins per block, in late 2012 it went to 25 coins per block, and so on. The size of
-     * a coinbase transaction is inflation plus fees.</p>
-     *
-     * <p>The half-life is controlled by {@link NetworkParameters#getSubsidyDecreaseBlockCount()}.</p>
-     *
-     * @param height the height of the block to calculate inflation for
-     */
-    public Coin getBlockInflation(int height) {
-        return Coin.FIFTY_COINS.shiftRight(height / getSubsidyDecreaseBlockCount());
+    public final boolean isRewardHalvingPoint(final int height) {
+        return ((height + 1) % REWARD_HALVING_INTERVAL) == 0;
     }
 
     /**
      * Checks if we are at a difficulty transition point.
-     * @param previousHeight The height of the previous stored block
+     * @param height The height of the previous stored block
      * @return If this is a difficulty transition point
      */
-    public final boolean isDifficultyTransitionPoint(final int previousHeight) {
-        return ((previousHeight + 1) % this.getInterval()) == 0;
+    public final boolean isDifficultyTransitionPoint(final int height) {
+        return ((height + 1) % this.getInterval()) == 0;
     }
 
     @Override
@@ -168,9 +148,7 @@ public abstract class AbstractBitcoinNetParams extends NetworkParameters {
         return MAX_MONEY;
     }
 
-    /** @deprecated use {@link TransactionOutput#getMinNonDustValue()} */
     @Override
-    @Deprecated
     public Coin getMinNonDustOutput() {
         return Transaction.MIN_NONDUST_OUTPUT;
     }

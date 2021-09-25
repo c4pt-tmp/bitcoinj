@@ -17,19 +17,21 @@
 
 package org.bitcoinj.crypto;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
-
-import java.util.Random;
-import java.util.UUID;
-
 import org.bitcoinj.core.Utils;
+import org.bitcoinj.utils.BriefLogFormatter;
+import com.google.protobuf.ByteString;
+
+import org.bitcoinj.wallet.Protos;
+import org.bitcoinj.wallet.Protos.ScryptParameters;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Random;
+import java.util.UUID;
+
+import static org.junit.Assert.*;
 
 public class KeyCrypterScryptTest {
 
@@ -38,21 +40,27 @@ public class KeyCrypterScryptTest {
     // Nonsense bytes for encryption test.
     private static final byte[] TEST_BYTES1 = {0, -101, 2, 103, -4, 105, 6, 107, 8, -109, 10, 111, -12, 113, 14, -115, 16, 117, -18, 119, 20, 121, 22, 123, -24, 125, 26, 127, -28, 29, -30, 31};
 
-    private static final int SCRYPT_ITERATIONS = 256;
     private static final CharSequence PASSWORD1 = "aTestPassword";
     private static final CharSequence PASSWORD2 = "0123456789";
+
     private static final CharSequence WRONG_PASSWORD = "thisIsTheWrongPassword";
     private static final CharSequence WRONG_PASSWORD2 = "anotherWrongPassword";
 
-    private KeyCrypterScrypt keyCrypter;
+    private ScryptParameters scryptParameters;
 
     @Before
     public void setUp() throws Exception {
-        keyCrypter = new KeyCrypterScrypt(SCRYPT_ITERATIONS);
+        Protos.ScryptParameters.Builder scryptParametersBuilder = Protos.ScryptParameters.newBuilder()
+                .setSalt(ByteString.copyFrom(KeyCrypterScrypt.randomSalt()));
+        scryptParameters = scryptParametersBuilder.build();
+
+        BriefLogFormatter.init();
     }
 
     @Test
     public void testKeyCrypterGood1() throws KeyCrypterException {
+        KeyCrypterScrypt keyCrypter = new KeyCrypterScrypt(scryptParameters);
+
         // Encrypt.
         EncryptedData data = keyCrypter.encrypt(TEST_BYTES1, keyCrypter.deriveKey(PASSWORD1));
         assertNotNull(data);
@@ -71,6 +79,8 @@ public class KeyCrypterScryptTest {
      */
     @Test
     public void testKeyCrypterGood2() {
+        KeyCrypterScrypt keyCrypter = new KeyCrypterScrypt(scryptParameters);
+
         // Trying random UUIDs for plainText and passwords.
         int numberOfTests = 16;
         for (int i = 0; i < numberOfTests; i++) {
@@ -89,6 +99,8 @@ public class KeyCrypterScryptTest {
 
     @Test
     public void testKeyCrypterWrongPassword() throws KeyCrypterException {
+        KeyCrypterScrypt keyCrypter = new KeyCrypterScrypt(scryptParameters);
+
         // create a longer encryption string
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < 100; i++) {
@@ -115,6 +127,8 @@ public class KeyCrypterScryptTest {
 
     @Test
     public void testEncryptDecryptBytes1() throws KeyCrypterException {
+        KeyCrypterScrypt keyCrypter = new KeyCrypterScrypt(scryptParameters);
+
         // Encrypt bytes.
         EncryptedData data = keyCrypter.encrypt(TEST_BYTES1, keyCrypter.deriveKey(PASSWORD1));
         assertNotNull(data);
@@ -129,6 +143,8 @@ public class KeyCrypterScryptTest {
 
     @Test
     public void testEncryptDecryptBytes2() throws KeyCrypterException {
+        KeyCrypterScrypt keyCrypter = new KeyCrypterScrypt(scryptParameters);
+
         // Encrypt random bytes of various lengths up to length 50.
         Random random = new Random();
 

@@ -66,7 +66,7 @@ public class HeadersMessage extends Message {
 
     @Override
     protected void parse() throws ProtocolException {
-        int numHeaders = readVarInt().intValue();
+        long numHeaders = readVarInt();
         if (numHeaders > MAX_HEADERS)
             throw new ProtocolException("Too many headers: got " + numHeaders + " which is larger than " +
                                          MAX_HEADERS);

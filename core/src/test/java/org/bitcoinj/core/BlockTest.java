@@ -23,7 +23,6 @@ import org.bitcoinj.core.AbstractBlockChain.NewBlockType;
 import org.bitcoinj.params.MainNetParams;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.params.UnitTestParams;
-import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptOpCodes;
 import org.bitcoinj.wallet.Wallet;
 import org.bitcoinj.wallet.Wallet.BalanceType;
@@ -73,6 +72,7 @@ public class BlockTest {
         block700000.verify(Block.BLOCK_HEIGHT_GENESIS, EnumSet.noneOf(Block.VerifyFlag.class));
     }
     
+    @SuppressWarnings("deprecation")
     @Test
     public void testDate() throws Exception {
         assertEquals("2016-02-13T22:59:39Z", Utils.dateTimeFormat(block700000.getTime()));
@@ -135,7 +135,7 @@ public class BlockTest {
         // proves that transaction serialization works, along with all its subobjects like scripts and in/outpoints.
         //
         // NB: This tests the bitcoin serialization protocol.
-        assertArrayEquals(block700000Bytes, block700000.bitcoinSerialize());
+        assertTrue(Arrays.equals(block700000Bytes, block700000.bitcoinSerialize()));
     }
     
     @Test
@@ -220,7 +220,7 @@ public class BlockTest {
         ECKey miningKey = DumpedPrivateKey.fromBase58(MAINNET, MINING_PRIVATE_KEY).getKey();
         assertNotNull(miningKey);
         Context context = new Context(MAINNET);
-        Wallet wallet = Wallet.createDeterministic(context, Script.ScriptType.P2PKH);
+        Wallet wallet = new Wallet(context);
         wallet.importKey(miningKey);
 
         // Initial balance should be zero by construction.
@@ -353,14 +353,5 @@ public class BlockTest {
         } catch (ProtocolException e) {
             //Expected, do nothing
         }
-    }
-
-    @Test
-    public void testGenesisBlock() {
-        Block genesisBlock = Block.createGenesis(MainNetParams.get());
-        genesisBlock.setDifficultyTarget(0x1d00ffffL);
-        genesisBlock.setTime(1231006505L);
-        genesisBlock.setNonce(2083236893);
-        assertEquals(Sha256Hash.wrap("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"), genesisBlock.getHash());
     }
 }

@@ -24,7 +24,6 @@ import java.util.Date;
 import org.bitcoinj.core.Block;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.core.VerificationException;
@@ -42,32 +41,27 @@ public class TestNet3Params extends AbstractBitcoinNetParams {
     public static final int TESTNET_MAJORITY_WINDOW = 100;
     public static final int TESTNET_MAJORITY_REJECT_BLOCK_OUTDATED = 75;
     public static final int TESTNET_MAJORITY_ENFORCE_BLOCK_UPGRADE = 51;
-    private static final long GENESIS_TIME = 1296688602;
-    private static final long GENESIS_NONCE = 414098458;
-    private static final Sha256Hash GENESIS_HASH = Sha256Hash.wrap("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943");
 
     public TestNet3Params() {
         super();
         id = ID_TESTNET;
-
-        targetTimespan = TARGET_TIMESPAN;
-        maxTarget = Utils.decodeCompactBits(Block.STANDARD_MAX_DIFFICULTY_TARGET);
-
-        port = 18333;
         packetMagic = 0x0b110907;
-        dumpedPrivateKeyHeader = 239;
+        interval = INTERVAL;
+        targetTimespan = TARGET_TIMESPAN;
+        maxTarget = Utils.decodeCompactBits(0x1d00ffffL);
+        port = 18333;
         addressHeader = 111;
         p2shHeader = 196;
+        dumpedPrivateKeyHeader = 239;
         segwitAddressHrp = "tb";
+        genesisBlock.setTime(1296688602L);
+        genesisBlock.setDifficultyTarget(0x1d00ffffL);
+        genesisBlock.setNonce(414098458);
         spendableCoinbaseDepth = 100;
-        bip32HeaderP2PKHpub = 0x043587cf; // The 4 byte header that serializes in base58 to "tpub".
-        bip32HeaderP2PKHpriv = 0x04358394; // The 4 byte header that serializes in base58 to "tprv"
-        bip32HeaderP2WPKHpub = 0x045f1cf6; // The 4 byte header that serializes in base58 to "vpub".
-        bip32HeaderP2WPKHpriv = 0x045f18bc; // The 4 byte header that serializes in base58 to "vprv"
-
-        majorityEnforceBlockUpgrade = TESTNET_MAJORITY_ENFORCE_BLOCK_UPGRADE;
-        majorityRejectBlockOutdated = TESTNET_MAJORITY_REJECT_BLOCK_OUTDATED;
-        majorityWindow = TESTNET_MAJORITY_WINDOW;
+        subsidyDecreaseBlockCount = 210000;
+        String genesisHash = genesisBlock.getHashAsString();
+        checkState(genesisHash.equals("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"));
+        alertSigningKey = Utils.HEX.decode("04302390343f91cc401d56d68b123028bf52e5fca1939df127f63c6467cdf9c8e2c14b61104cf817d0b780da337893ecc4aaff1309e536162dabbdb45200ca2b0a");
 
         dnsSeeds = new String[] {
                 "testnet-seed.bitcoin.jonasschnelli.ch", // Jonas Schnelli
@@ -84,7 +78,14 @@ public class TestNet3Params extends AbstractBitcoinNetParams {
                 )
         };
         addrSeeds = null;
+        bip32HeaderP2PKHpub = 0x043587cf; // The 4 byte header that serializes in base58 to "tpub".
+        bip32HeaderP2PKHpriv = 0x04358394; // The 4 byte header that serializes in base58 to "tprv"
+        bip32HeaderP2WPKHpub = 0x045f1cf6; // The 4 byte header that serializes in base58 to "vpub".
+        bip32HeaderP2WPKHpriv = 0x045f18bc; // The 4 byte header that serializes in base58 to "vprv"
 
+        majorityEnforceBlockUpgrade = TESTNET_MAJORITY_ENFORCE_BLOCK_UPGRADE;
+        majorityRejectBlockOutdated = TESTNET_MAJORITY_REJECT_BLOCK_OUTDATED;
+        majorityWindow = TESTNET_MAJORITY_WINDOW;
     }
 
     private static TestNet3Params instance;
@@ -93,20 +94,6 @@ public class TestNet3Params extends AbstractBitcoinNetParams {
             instance = new TestNet3Params();
         }
         return instance;
-    }
-
-    @Override
-    public Block getGenesisBlock() {
-        synchronized (GENESIS_HASH) {
-            if (genesisBlock == null) {
-                genesisBlock = Block.createGenesis(this);
-                genesisBlock.setDifficultyTarget(Block.STANDARD_MAX_DIFFICULTY_TARGET);
-                genesisBlock.setTime(GENESIS_TIME);
-                genesisBlock.setNonce(GENESIS_NONCE);
-                checkState(genesisBlock.getHash().equals(GENESIS_HASH), "Invalid genesis hash");
-            }
-        }
-        return genesisBlock;
     }
 
     @Override

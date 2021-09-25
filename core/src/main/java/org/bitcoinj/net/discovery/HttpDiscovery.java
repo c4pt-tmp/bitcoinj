@@ -84,7 +84,7 @@ public class HttpDiscovery implements PeerDiscovery {
     }
 
     @Override
-    public List<InetSocketAddress> getPeers(long services, long timeoutValue, TimeUnit timeoutUnit) throws PeerDiscoveryException {
+    public InetSocketAddress[] getPeers(long services, long timeoutValue, TimeUnit timeoutUnit) throws PeerDiscoveryException {
         try {
             HttpUrl.Builder url = HttpUrl.get(details.uri).newBuilder();
             if (services != 0)
@@ -106,8 +106,8 @@ public class HttpDiscovery implements PeerDiscovery {
                 zip.close(); // will close InputStream as well
             }
 
-            final List<InetSocketAddress> peers = protoToAddrs(proto);
-            log.info("Got {} peers from {}", peers.size(), url);
+            final InetSocketAddress[] peers = protoToAddrs(proto);
+            log.info("Got {} peers from {}", peers.length, url);
             return peers;
         } catch (PeerDiscoveryException e1) {
             throw e1;
@@ -117,7 +117,7 @@ public class HttpDiscovery implements PeerDiscovery {
     }
 
     @VisibleForTesting
-    public List<InetSocketAddress> protoToAddrs(PeerSeedProtos.SignedPeerSeeds proto) throws PeerDiscoveryException,
+    public InetSocketAddress[] protoToAddrs(PeerSeedProtos.SignedPeerSeeds proto) throws PeerDiscoveryException,
             InvalidProtocolBufferException, SignatureDecodeException, SignatureException {
         if (details.pubkey != null) {
             if (!Arrays.equals(proto.getPubkey().toByteArray(), details.pubkey.getPubKey()))
@@ -130,9 +130,10 @@ public class HttpDiscovery implements PeerDiscovery {
             throw new PeerDiscoveryException("Seed data is more than one day old: replay attack?");
         if (!seeds.getNet().equals(params.getPaymentProtocolId()))
             throw new PeerDiscoveryException("Network mismatch");
-        List<InetSocketAddress> results = new ArrayList<>(seeds.getSeedCount());
+        InetSocketAddress[] results = new InetSocketAddress[seeds.getSeedCount()];
+        int i = 0;
         for (PeerSeedProtos.PeerSeedData data : seeds.getSeedList())
-            results.add(new InetSocketAddress(data.getIpAddress(), data.getPort()));
+            results[i++] = new InetSocketAddress(data.getIpAddress(), data.getPort());
         return results;
     }
 

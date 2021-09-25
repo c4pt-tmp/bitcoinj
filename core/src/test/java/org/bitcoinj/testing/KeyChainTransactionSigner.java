@@ -44,7 +44,7 @@ public class KeyChainTransactionSigner extends CustomTransactionSigner {
 
     @Override
     protected SignatureAndKey getSignature(Sha256Hash sighash, List<ChildNumber> derivationPath) {
-        List<ChildNumber> keyPath = ImmutableList.copyOf(derivationPath);
+        ImmutableList<ChildNumber> keyPath = ImmutableList.copyOf(derivationPath);
         DeterministicKey key = keyChain.getKeyByPath(keyPath, true);
         return new SignatureAndKey(key.sign(sighash), key.dropPrivateBytes().dropParent());
     }

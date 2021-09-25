@@ -19,7 +19,6 @@ package org.bitcoinj.core;
 
 import org.bitcoinj.params.MainNetParams;
 import org.bitcoinj.params.UnitTestParams;
-import org.bitcoinj.script.Script;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.MemoryBlockStore;
 import org.bitcoinj.wallet.Wallet;
@@ -87,7 +86,7 @@ public class ParseByteCacheTest {
     public void setUp() throws Exception {
         Utils.setMockClock(); // Use mock clock
         Context context = new Context(UNITTEST);
-        Wallet wallet = Wallet.createDeterministic(context, Script.ScriptType.P2PKH);
+        Wallet wallet = new Wallet(context);
         wallet.freshReceiveKey();
 
         resetBlockStore();
@@ -175,7 +174,7 @@ public class ParseByteCacheTest {
         // verify our reference BitcoinSerializer produces matching byte array.
         bos.reset();
         bsRef.serialize(bRef, bos);
-        assertArrayEquals(bos.toByteArray(), blockBytes);
+        assertTrue(Arrays.equals(bos.toByteArray(), blockBytes));
         
         // check retain status survive both before and after a serialization
         assertEquals(retain, b1.isHeaderBytesValid());
@@ -368,7 +367,7 @@ public class ParseByteCacheTest {
         // verify our reference BitcoinSerializer produces matching byte array.
         bos.reset();
         bsRef.serialize(tRef, bos);
-        assertArrayEquals(bos.toByteArray(), txBytes);
+        assertTrue(Arrays.equals(bos.toByteArray(), txBytes));
 
         // check and retain status survive both before and after a serialization
         assertEquals(retain, t1.isCached());
@@ -425,8 +424,8 @@ public class ParseByteCacheTest {
 
         bos.reset();
         bs.serialize(m2, bos);
-        byte[] b2 = bos.toByteArray();
-        assertArrayEquals(b1, b2);
+        byte[] b2 = bos.toByteArray(); 
+        assertTrue(Arrays.equals(b1, b2));
 
         if (sourceBytes != null) {
             assertTrue(arrayContains(sourceBytes, b1));

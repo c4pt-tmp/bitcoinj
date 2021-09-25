@@ -30,7 +30,6 @@ import org.bitcoinj.crypto.*;
 import org.bitcoinj.script.*;
 import org.bitcoinj.script.Script.ScriptType;
 import org.bitcoinj.utils.*;
-import org.bitcoinj.wallet.listeners.CurrentKeyChangeEventListener;
 import org.bitcoinj.wallet.listeners.KeyChainEventListener;
 import org.slf4j.*;
 import org.bouncycastle.crypto.params.*;
@@ -134,39 +133,6 @@ public class KeyChainGroup implements KeyBag {
         }
 
         /**
-         * <p>Add chain from a given account key.</p>
-         * <p>In the case of P2PKH, just a P2PKH chain is created and activated which is then the default chain for fresh
-         * addresses. It can be upgraded to P2WPKH later.</p>
-         * <p>In the case of P2WPKH, both a P2PKH and a P2WPKH chain are created and activated, the latter being the default
-         * chain. This behaviour will likely be changed with bitcoinj 0.16 such that only a P2WPKH chain is created and
-         * activated.</p>
-         * @param accountKey deterministic account key to derive all keys from
-         * @param outputScriptType type of addresses (aka output scripts) to generate for receiving
-         */
-        public Builder fromKey(DeterministicKey accountKey, Script.ScriptType outputScriptType) {
-            if (outputScriptType == Script.ScriptType.P2PKH) {
-                DeterministicKeyChain chain = DeterministicKeyChain.builder().spend(accountKey)
-                        .outputScriptType(Script.ScriptType.P2PKH)
-                        .accountPath(structure.accountPathFor(Script.ScriptType.P2PKH)).build();
-                this.chains.clear();
-                this.chains.add(chain);
-            } else if (outputScriptType == Script.ScriptType.P2WPKH) {
-                DeterministicKeyChain fallbackChain = DeterministicKeyChain.builder().spend(accountKey)
-                        .outputScriptType(Script.ScriptType.P2PKH)
-                        .accountPath(structure.accountPathFor(Script.ScriptType.P2PKH)).build();
-                DeterministicKeyChain defaultChain = DeterministicKeyChain.builder().spend(accountKey)
-                        .outputScriptType(Script.ScriptType.P2WPKH)
-                        .accountPath(structure.accountPathFor(Script.ScriptType.P2WPKH)).build();
-                this.chains.clear();
-                this.chains.add(fallbackChain);
-                this.chains.add(defaultChain);
-            } else {
-                throw new IllegalArgumentException(outputScriptType.toString());
-            }
-            return this;
-        }
-
-        /**
          * Add a single chain.
          * @param chain to add
          */
@@ -227,8 +193,6 @@ public class KeyChainGroup implements KeyBag {
     @Nullable private KeyCrypter keyCrypter;
     private int lookaheadSize = -1;
     private int lookaheadThreshold = -1;
-
-    private final CopyOnWriteArrayList<ListenerRegistration<CurrentKeyChangeEventListener>> currentKeyChangeListeners = new CopyOnWriteArrayList<>();
 
     /** Creates a keychain group with just a basic chain. No deterministic chains will be created automatically. */
     public static KeyChainGroup createBasic(NetworkParameters params) {
@@ -310,7 +274,6 @@ public class KeyChainGroup implements KeyBag {
         chains.add(chain);
         currentKeys.clear();
         currentAddresses.clear();
-        queueOnCurrentKeyChanged();
     }
 
     /**
@@ -527,7 +490,7 @@ public class KeyChainGroup implements KeyBag {
     public int importKeysAndEncrypt(final List<ECKey> keys, KeyParameter aesKey) {
         // TODO: Firstly check if the aes key can decrypt any of the existing keys successfully.
         checkState(keyCrypter != null, "Not encrypted");
-        LinkedList<ECKey> encryptedKeys = new LinkedList<>();
+        LinkedList<ECKey> encryptedKeys = Lists.newLinkedList();
         for (ECKey key : keys) {
             if (key.isEncrypted())
                 throw new IllegalArgumentException("Cannot provide already encrypted keys");
@@ -608,7 +571,6 @@ public class KeyChainGroup implements KeyBag {
             if (entry.getValue() != null && entry.getValue().equals(address)) {
                 log.info("Marking P2SH address as used: {}", address);
                 currentAddresses.put(entry.getKey(), freshAddress(entry.getKey()));
-                queueOnCurrentKeyChanged();
                 return;
             }
         }
@@ -622,7 +584,6 @@ public class KeyChainGroup implements KeyBag {
             if (entry.getValue() != null && entry.getValue().equals(key)) {
                 log.info("Marking key as used: {}", key);
                 currentKeys.put(entry.getKey(), freshKey(entry.getKey()));
-                queueOnCurrentKeyChanged();
                 return;
             }
         }
@@ -844,44 +805,13 @@ public class KeyChainGroup implements KeyBag {
         return basic.removeEventListener(listener);
     }
 
-    /** Removes a listener for events that are run when a current key and/or address changes. */
-    public void addCurrentKeyChangeEventListener(CurrentKeyChangeEventListener listener) {
-        addCurrentKeyChangeEventListener(listener, Threading.USER_THREAD);
-    }
-
-    /**
-     * Adds a listener for events that are run when a current key and/or address changes, on the given
-     * executor.
-     */
-    public void addCurrentKeyChangeEventListener(CurrentKeyChangeEventListener listener, Executor executor) {
-        checkNotNull(listener);
-        currentKeyChangeListeners.add(new ListenerRegistration<>(listener, executor));
-    }
-
-    /** Removes a listener for events that are run when a current key and/or address changes. */
-    public boolean removeCurrentKeyChangeEventListener(CurrentKeyChangeEventListener listener) {
-        checkNotNull(listener);
-        return ListenerRegistration.removeFromList(listener, currentKeyChangeListeners);
-    }
-
-    private void queueOnCurrentKeyChanged() {
-        for (final ListenerRegistration<CurrentKeyChangeEventListener> registration : currentKeyChangeListeners) {
-            registration.executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    registration.listener.onCurrentKeyChanged();
-                }
-            });
-        }
-    }
-
     /** Returns a list of key protobufs obtained by merging the chains. */
     public List<Protos.Key> serializeToProtobuf() {
         List<Protos.Key> result;
         if (basic != null)
             result = basic.serializeToProtobuf();
         else
-            result = new ArrayList<>();
+            result = Lists.newArrayList();
         if (chains != null)
             for (DeterministicKeyChain chain : chains)
                 result.addAll(chain.serializeToProtobuf());
@@ -1052,17 +982,17 @@ public class KeyChainGroup implements KeyBag {
         // kinds of KeyPurpose are introduced.
         if (activeChain.getIssuedExternalKeys() > 0) {
             DeterministicKey currentExternalKey = activeChain.getKeyByPath(
-                    activeChain.getAccountPath()
-                            .extend(DeterministicKeyChain.EXTERNAL_SUBPATH)
-                            .extend(new ChildNumber(activeChain.getIssuedExternalKeys() - 1)));
+                    HDUtils.append(
+                            HDUtils.concat(activeChain.getAccountPath(), DeterministicKeyChain.EXTERNAL_SUBPATH),
+                            new ChildNumber(activeChain.getIssuedExternalKeys() - 1)));
             currentKeys.put(KeyChain.KeyPurpose.RECEIVE_FUNDS, currentExternalKey);
         }
 
         if (activeChain.getIssuedInternalKeys() > 0) {
             DeterministicKey currentInternalKey = activeChain.getKeyByPath(
-                    activeChain.getAccountPath()
-                            .extend(DeterministicKeyChain.INTERNAL_SUBPATH)
-                            .extend(new ChildNumber(activeChain.getIssuedInternalKeys() - 1)));
+                    HDUtils.append(
+                            HDUtils.concat(activeChain.getAccountPath(), DeterministicKeyChain.INTERNAL_SUBPATH),
+                            new ChildNumber(activeChain.getIssuedInternalKeys() - 1)));
             currentKeys.put(KeyChain.KeyPurpose.CHANGE, currentInternalKey);
         }
         return currentKeys;
@@ -1070,7 +1000,7 @@ public class KeyChainGroup implements KeyBag {
 
     private static void extractFollowingKeychains(List<DeterministicKeyChain> chains) {
         // look for following key chains and map them to the watch keys of followed keychains
-        List<DeterministicKeyChain> followingChains = new ArrayList<>();
+        List<DeterministicKeyChain> followingChains = Lists.newArrayList();
         for (Iterator<DeterministicKeyChain> it = chains.iterator(); it.hasNext(); ) {
             DeterministicKeyChain chain = it.next();
             if (chain.isFollowing()) {
@@ -1080,7 +1010,7 @@ public class KeyChainGroup implements KeyBag {
                 if (!(chain instanceof MarriedKeyChain))
                     throw new IllegalStateException();
                 ((MarriedKeyChain)chain).setFollowingKeyChains(followingChains);
-                followingChains = new ArrayList<>();
+                followingChains = Lists.newArrayList();
             }
         }
     }

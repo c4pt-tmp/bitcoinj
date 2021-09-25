@@ -23,7 +23,7 @@ import java.math.BigInteger;
 
 import org.bitcoinj.core.Coin;
 
-import java.util.Objects;
+import com.google.common.base.Objects;
 
 /**
  * An exchange rate is expressed as a ratio of a {@link Coin} and a {@link Fiat} amount.
@@ -86,11 +86,11 @@ public class ExchangeRate implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ExchangeRate other = (ExchangeRate) o;
-        return Objects.equals(this.coin, other.coin) && Objects.equals(this.fiat, other.fiat);
+        return Objects.equal(this.coin, other.coin) && Objects.equal(this.fiat, other.fiat);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(coin, fiat);
+        return Objects.hashCode(coin, fiat);
     }
 }

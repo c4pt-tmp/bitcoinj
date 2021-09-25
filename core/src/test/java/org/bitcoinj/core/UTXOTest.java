@@ -21,7 +21,8 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 import org.bitcoinj.script.ScriptBuilder;
 import org.junit.Test;
@@ -29,13 +30,13 @@ import org.junit.Test;
 public class UTXOTest {
 
     @Test
-    public void testSerialization() throws Exception {
+    public void testJavaSerialization() throws Exception {
         ECKey key = new ECKey();
         UTXO utxo = new UTXO(Sha256Hash.of(new byte[]{1,2,3}), 1, Coin.COIN, 10, true, ScriptBuilder.createP2PKOutputScript(key));
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        utxo.serializeToStream(os);
-        InputStream is = new ByteArrayInputStream(os.toByteArray());
-        UTXO utxoCopy = UTXO.fromStream(is);
+        new ObjectOutputStream(os).writeObject(utxo);
+        UTXO utxoCopy = (UTXO) new ObjectInputStream(
+                new ByteArrayInputStream(os.toByteArray())).readObject();
         assertEquals(utxo, utxoCopy);
         assertEquals(utxo.getValue(), utxoCopy.getValue());
         assertEquals(utxo.getHeight(), utxoCopy.getHeight());

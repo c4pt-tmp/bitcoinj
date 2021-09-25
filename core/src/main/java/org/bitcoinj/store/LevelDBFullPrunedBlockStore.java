@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
 import static org.fusesource.leveldbjni.JniDBFactory.*;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.Lists;
 
 /**
  * <p>
@@ -330,7 +331,7 @@ public class LevelDBFullPrunedBlockStore implements FullPrunedBlockStore {
             // because of how the reference client inits
             // its database - the genesis transaction isn't actually in the db
             // so its spent flags can never be updated.
-            List<Transaction> genesisTransactions = new LinkedList<>();
+            List<Transaction> genesisTransactions = Lists.newLinkedList();
             StoredUndoableBlock storedGenesis = new StoredUndoableBlock(params.getGenesisBlock().getHash(),
                     genesisTransactions);
             beginDatabaseBatchWrite();
@@ -741,12 +742,16 @@ public class LevelDBFullPrunedBlockStore implements FullPrunedBlockStore {
                 return null;
             }
             ByteArrayInputStream bis = new ByteArrayInputStream(inbytes);
-            UTXO txout = UTXO.fromStream(bis);
+            UTXO txout = new UTXO(bis);
 
             if (instrument)
                 endMethod("getTransactionOutput");
             return txout;
-        } catch (DBException | IOException e) {
+        } catch (DBException e) {
+            log.error("Exception in getTransactionOutput.", e);
+            if (instrument)
+                endMethod("getTransactionOutput");
+        } catch (IOException e) {
             log.error("Exception in getTransactionOutput.", e);
             if (instrument)
                 endMethod("getTransactionOutput");
@@ -889,7 +894,11 @@ public class LevelDBFullPrunedBlockStore implements FullPrunedBlockStore {
                 a = LegacyAddress.fromBase58(params, out.getAddress());
                 hashBytes = a.getHash();
             }
-        } catch (AddressFormatException | ScriptException e) {
+        } catch (AddressFormatException e) {
+            if (instrument)
+                endMethod("removeUnspentTransactionOutput");
+            return;
+        } catch (ScriptException e) {
             if (instrument)
                 endMethod("removeUnspentTransactionOutput");
             return;

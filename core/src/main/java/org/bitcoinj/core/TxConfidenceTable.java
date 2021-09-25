@@ -37,7 +37,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * all transactions not currently included in the best chain - it's simply a cache.</p>
  */
 public class TxConfidenceTable {
-    protected final ReentrantLock lock = Threading.lock(TxConfidenceTable.class);
+    protected ReentrantLock lock = Threading.lock("txconfidencetable");
 
     private static class WeakConfidenceReference extends WeakReference<TransactionConfidence> {
         public Sha256Hash hash;

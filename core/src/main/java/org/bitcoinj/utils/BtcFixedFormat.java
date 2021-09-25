@@ -18,7 +18,7 @@ package org.bitcoinj.utils;
 
 import static org.bitcoinj.core.Coin.SMALLEST_UNIT_EXPONENT;
 import static com.google.common.base.Preconditions.checkArgument;
-import java.util.Objects;
+import com.google.common.base.Objects;
 import org.bitcoinj.core.Coin;
 
 import java.math.BigInteger;
@@ -146,7 +146,7 @@ public final class BtcFixedFormat extends BtcFormat {
      *  @see java.lang.Object#hashCode
      */
     @Override public int hashCode() {
-        return Objects.hash(super.hashCode(), scale);
+        return Objects.hashCode(super.hashCode(), scale);
     }
 
     private static String prefixLabel(int scale) {

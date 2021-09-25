@@ -16,6 +16,7 @@
 
 package org.bitcoinj.net;
 
+import com.google.common.collect.Lists;
 import org.bitcoinj.core.BloomFilter;
 import org.bitcoinj.core.PeerFilterProvider;
 import com.google.common.collect.ImmutableList;
@@ -56,7 +57,7 @@ public class FilterMerger {
     }
 
     public Result calculate(ImmutableList<PeerFilterProvider> providers) {
-        LinkedList<PeerFilterProvider> begunProviders = new LinkedList<>();
+        LinkedList<PeerFilterProvider> begunProviders = Lists.newLinkedList();
         try {
             // All providers must be in a consistent, unchanging state because the filter is a merged one that's
             // large enough for all providers elements: if a provider were to get more elements in the middle of the
@@ -69,9 +70,11 @@ public class FilterMerger {
             Result result = new Result();
             result.earliestKeyTimeSecs = Long.MAX_VALUE;
             int elements = 0;
+            boolean requiresUpdateAll = false;
             for (PeerFilterProvider p : providers) {
                 result.earliestKeyTimeSecs = Math.min(result.earliestKeyTimeSecs, p.getEarliestKeyCreationTime());
                 elements += p.getBloomFilterElementCount();
+                requiresUpdateAll = requiresUpdateAll || p.isRequiringUpdateAllBloomFilter();
             }
 
             if (elements > 0) {
@@ -80,10 +83,10 @@ public class FilterMerger {
                 // The constant 100 here is somewhat arbitrary, but makes sense for small to medium wallets -
                 // it will likely mean we never need to create a filter with different parameters.
                 lastBloomFilterElementCount = elements > lastBloomFilterElementCount ? elements + 100 : lastBloomFilterElementCount;
+                BloomFilter.BloomUpdate bloomFlags =
+                        requiresUpdateAll ? BloomFilter.BloomUpdate.UPDATE_ALL : BloomFilter.BloomUpdate.UPDATE_P2PUBKEY_ONLY;
                 double fpRate = vBloomFilterFPRate;
-                // We now always use UPDATE_ALL because with SegWit there is hardly any wallet that can do without.
-                BloomFilter filter = new BloomFilter(lastBloomFilterElementCount, fpRate, bloomFilterTweak,
-                        BloomFilter.BloomUpdate.UPDATE_ALL);
+                BloomFilter filter = new BloomFilter(lastBloomFilterElementCount, fpRate, bloomFilterTweak, bloomFlags);
                 for (PeerFilterProvider p : providers)
                     filter.merge(p.getBloomFilter(lastBloomFilterElementCount, fpRate, bloomFilterTweak));
 

@@ -23,8 +23,6 @@ import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -84,10 +82,10 @@ public class SeedPeers implements PeerDiscovery {
     }
 
     /**
-     * Returns all the Bitcoin nodes within the list.
+     * Returns an array containing all the Bitcoin nodes within the list.
      */
     @Override
-    public List<InetSocketAddress> getPeers(long services, long timeoutValue, TimeUnit timeoutUnit) throws PeerDiscoveryException {
+    public InetSocketAddress[] getPeers(long services, long timeoutValue, TimeUnit timeoutUnit) throws PeerDiscoveryException {
         if (services != 0)
             throw new PeerDiscoveryException("Pre-determined peers cannot be filtered by services: " + services);
         try {
@@ -97,10 +95,10 @@ public class SeedPeers implements PeerDiscovery {
         }
     }
 
-    private List<InetSocketAddress> allPeers() throws UnknownHostException {
-        List<InetSocketAddress> addresses = new ArrayList<>(seedAddrs.length);
-        for (int seedAddr : seedAddrs) {
-            addresses.add(new InetSocketAddress(convertAddress(seedAddr), params.getPort()));
+    private InetSocketAddress[] allPeers() throws UnknownHostException {
+        InetSocketAddress[] addresses = new InetSocketAddress[seedAddrs.length];
+        for (int i = 0; i < seedAddrs.length; ++i) {
+            addresses[i] = new InetSocketAddress(convertAddress(seedAddrs[i]), params.getPort());
         }
         return addresses;
     }

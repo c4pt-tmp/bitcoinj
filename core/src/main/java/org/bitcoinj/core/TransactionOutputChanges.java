@@ -41,12 +41,12 @@ public class TransactionOutputChanges {
         int numOutsCreated = (int) Utils.readUint32FromStream(in);
         txOutsCreated = new LinkedList<>();
         for (int i = 0; i < numOutsCreated; i++)
-            txOutsCreated.add(UTXO.fromStream(in));
+            txOutsCreated.add(new UTXO(in));
         
         int numOutsSpent = (int) Utils.readUint32FromStream(in);
         txOutsSpent = new LinkedList<>();
         for (int i = 0; i < numOutsSpent; i++)
-            txOutsSpent.add(UTXO.fromStream(in));
+            txOutsSpent.add(new UTXO(in));
     }
 
     public void serializeToStream(OutputStream bos) throws IOException {

@@ -1,6 +1,5 @@
 /*
  * Copyright 2011 Google Inc.
- * Copyright 2021 Andreas Schildbach
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +16,10 @@
 
 package org.bitcoinj.core;
 
-import com.google.common.primitives.Ints;
-
 /**
  * A variable-length encoded unsigned integer using Satoshi's encoding (a.k.a. "CompactSize").
  */
 public class VarInt {
-    /** @deprecated use {{@link #intValue()} or {{@link #longValue()}}} */
-    @Deprecated
     public final long value;
     private final int originallyEncodedSize;
 
@@ -59,14 +54,6 @@ public class VarInt {
             value = Utils.readInt64(buf, offset + 1);
             originallyEncodedSize = 9; // 1 marker + 8 data bytes (64 bits)
         }
-    }
-
-    public long longValue() {
-        return value;
-    }
-
-    public int intValue() {
-        return Ints.checkedCast(value);
     }
 
     /**

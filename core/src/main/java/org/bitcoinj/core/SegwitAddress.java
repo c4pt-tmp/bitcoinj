@@ -23,9 +23,9 @@ import java.io.ByteArrayOutputStream;
 
 import javax.annotation.Nullable;
 
-import com.google.common.primitives.UnsignedBytes;
 import org.bitcoinj.params.Networks;
 import org.bitcoinj.script.Script;
+import org.bitcoinj.script.Script.ScriptType;
 
 /**
  * <p>Implementation of native segwit addresses. They are composed of two parts:</p>
@@ -130,19 +130,19 @@ public class SegwitAddress extends Address {
 
     /**
      * Get the type of output script that will be used for sending to the address. This is either
-     * {@link Script.ScriptType#P2WPKH} or {@link Script.ScriptType#P2WSH}.
+     * {@link ScriptType#P2WPKH} or {@link ScriptType#P2WSH}.
      * 
      * @return type of output script
      */
     @Override
-    public Script.ScriptType getOutputScriptType() {
+    public ScriptType getOutputScriptType() {
         int version = getWitnessVersion();
         checkState(version == 0);
         int programLength = getWitnessProgram().length;
         if (programLength == WITNESS_PROGRAM_LENGTH_PKH)
-            return Script.ScriptType.P2WPKH;
+            return ScriptType.P2WPKH;
         if (programLength == WITNESS_PROGRAM_LENGTH_SH)
-            return Script.ScriptType.P2WSH;
+            return ScriptType.P2WSH;
         throw new IllegalStateException("Cannot happen.");
     }
 
@@ -246,20 +246,5 @@ public class SegwitAddress extends Address {
             throw new AddressFormatException("Could not convert bits, invalid padding");
         }
         return out.toByteArray();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param o other {@code Address} object
-     * @return comparison result
-     */
-    @Override
-    public int compareTo(Address o) {
-        int result = compareAddressPartial(o);
-        if (result != 0) return result;
-
-        // Compare the bytes
-        return UnsignedBytes.lexicographicalComparator().compare(this.bytes, o.bytes);
     }
 }
