@@ -297,7 +297,8 @@ public class WalletAppKit extends AbstractIdleService {
             vStore = new SPVBlockStore(params, chainFile);
             if (!chainFileExists || restoreFromSeed != null || restoreFromKey != null) {
                 if (checkpoints == null && !Utils.isAndroidRuntime()) {
-                    checkpoints = CheckpointManager.openStream(params);
+                    System.out.println("line 300 WalletAppKit.java needs checkpoint manager");
+                    //checkpoints = CheckpointManager.openStream(params);
                 }
 
                 if (checkpoints != null) {
@@ -321,7 +322,8 @@ public class WalletAppKit extends AbstractIdleService {
                         time = vWallet.getEarliestKeyCreationTime();
                     }
                     if (time > 0)
-                        CheckpointManager.checkpoint(params, checkpoints, vStore, time);
+                        System.out.println("checkpoint manager line 324 WalletAppKit.java");
+                       // CheckpointManager.checkpoint(params, checkpoints, vStore, time);
                     else
                         log.warn("Creating a new uncheckpointed block store due to a wallet with a creation time of zero: this will result in a very slow chain sync");
                 } else if (chainFileExists) {
