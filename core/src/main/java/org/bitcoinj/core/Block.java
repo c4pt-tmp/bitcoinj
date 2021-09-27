@@ -528,7 +528,7 @@ public class Block extends Message {
     public BigInteger getDifficultyTargetAsInteger() throws VerificationException {
         BigInteger target = Utils.decodeCompactBits(difficultyTarget);
         if (target.signum() <= 0 || target.compareTo(params.maxTarget) > 0)
-            throw new VerificationException("Difficulty target is bad: " + target.toString());
+          //  throw new VerificationException("Difficulty target is bad: " + target.toString());
         return target;
     }
 
@@ -543,9 +543,10 @@ public class Block extends Message {
         // To prevent this attack from being possible, elsewhere we check that the difficultyTarget
         // field is of the right value. This requires us to have the preceding blocks.
         BigInteger target = getDifficultyTargetAsInteger();
+     // should never arrive at this point since less than 0 not greater than 0
 
         BigInteger h = getHash().toBigInteger();
-        if (h.compareTo(target) > 0) {
+        if (h.compareTo(target) < 0) {
             // Proof of work check failed!
             if (throwException)
                 throw new VerificationException("Hash is higher than target: " + getHashAsString() + " vs "
