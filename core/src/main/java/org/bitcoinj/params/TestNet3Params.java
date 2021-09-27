@@ -41,9 +41,8 @@ public class TestNet3Params extends AbstractBitcoinNetParams {
       public static final int TESTNET_MAJORITY_WINDOW = 1000;
     public static final int TESTNET_MAJORITY_REJECT_BLOCK_OUTDATED = 750;
     public static final int TESTNET_MAJORITY_ENFORCE_BLOCK_UPGRADE = 501;
-    protected static final int DIFFICULTY_CHANGE_TARGET = 145000;
     public TestNet3Params() {
-    super(DIFFICULTY_CHANGE_TARGET);
+    super();
         id = ID_TESTNET;
          packetMagic = 0xfcc1b7dc;
 
