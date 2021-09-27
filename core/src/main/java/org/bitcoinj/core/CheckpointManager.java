@@ -79,20 +79,20 @@ public class CheckpointManager {
     // Map of block header time (in seconds) to data.
     protected final TreeMap<Long, StoredBlock> checkpoints = new TreeMap<>();
 
-   // protected final NetworkParameters params;
-   // protected final Sha256Hash dataHash;
+    protected final NetworkParameters params;
+    protected final Sha256Hash dataHash;
 
     public static final BaseEncoding BASE64 = BaseEncoding.base64().omitPadding();
 
     /** Loads the default checkpoints bundled with bitcoinj */
-    /*
+    
     public CheckpointManager(Context context) throws IOException {
         this(context.getParams(), null);
     }
-    */
-      //  /** Loads the checkpoints from the given stream */
+    
+        /** Loads the checkpoints from the given stream */
 
-/*
+
     public CheckpointManager(NetworkParameters params, @Nullable InputStream inputStream) throws IOException {
         this.params = checkNotNull(params);
         if (inputStream == null)
@@ -108,14 +108,14 @@ public class CheckpointManager {
             dataHash = readTextual(inputStream);
         else
             System.out.println("this would have thrown an exception to not read the checkpoint file with checkpointmanager.java");
-           // throw new IOException("Unsupported format.");
+            throw new IOException("Unsupported format.");
     }
-*/
+
     /** Returns a checkpoints stream pointing to inside the bitcoinj JAR */
-   // public static InputStream openStream(NetworkParameters params) {
-    //    return CheckpointManager.class.getResourceAsStream("/" + params.getId() + ".checkpoints.txt");
-  //  }
-/*
+   public static InputStream openStream(NetworkParameters params) {
+       return CheckpointManager.class.getResourceAsStream("/" + params.getId() + ".checkpoints.txt");
+    }
+
     private Sha256Hash readBinary(InputStream inputStream) throws IOException {
         DataInputStream dis = null;
         try {
@@ -191,12 +191,12 @@ public class CheckpointManager {
             if (reader != null) reader.close();
         }
     }
-*/
+
     /**
      * Returns a {@link StoredBlock} representing the last checkpoint before the given time, for example, normally
      * you would want to know the checkpoint before the earliest wallet birthday.
      */
-  /*
+  
     public StoredBlock getCheckpointBefore(long timeSecs) {
         try {
             checkArgument(timeSecs > params.getGenesisBlock().getTimeSeconds());
@@ -211,14 +211,14 @@ public class CheckpointManager {
     }
 
     /** Returns the number of checkpoints that were loaded. */
-    // public int numCheckpoints() {
-      //  return checkpoints.size();
-  //  }
+    public int numCheckpoints() {
+       return checkpoints.size();
+    }
 
     /** Returns a hash of the concatenated checkpoint data. */
-  //  public Sha256Hash getDataHash() {
-    //    return dataHash;
-  //  }
+    public Sha256Hash getDataHash() {
+        return dataHash;
+    }
 
     /**
      * <p>Convenience method that creates a CheckpointManager, loads the given data, gets the checkpoint for the given
@@ -227,7 +227,7 @@ public class CheckpointManager {
      *
      * <p>Note that timeSecs is adjusted backwards by a week to account for possible clock drift in the block headers.</p>
      */
-    /*
+    
     public static void checkpoint(NetworkParameters params, InputStream checkpoints, BlockStore store, long timeSecs)
             throws IOException, BlockStoreException {
         checkNotNull(params);
@@ -246,5 +246,5 @@ public class CheckpointManager {
         store.put(checkpoint);
         store.setChainHead(checkpoint);
     }
-    */
+    
 }
