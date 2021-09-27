@@ -79,8 +79,8 @@ public class CheckpointManager {
     // Map of block header time (in seconds) to data.
     protected final TreeMap<Long, StoredBlock> checkpoints = new TreeMap<>();
 
-    protected final NetworkParameters params;
-    protected final Sha256Hash dataHash;
+   // protected final NetworkParameters params;
+   // protected final Sha256Hash dataHash;
 
     public static final BaseEncoding BASE64 = BaseEncoding.base64().omitPadding();
 
@@ -112,9 +112,9 @@ public class CheckpointManager {
     }
 */
     /** Returns a checkpoints stream pointing to inside the bitcoinj JAR */
-    public static InputStream openStream(NetworkParameters params) {
-        return CheckpointManager.class.getResourceAsStream("/" + params.getId() + ".checkpoints.txt");
-    }
+   // public static InputStream openStream(NetworkParameters params) {
+    //    return CheckpointManager.class.getResourceAsStream("/" + params.getId() + ".checkpoints.txt");
+  //  }
 /*
     private Sha256Hash readBinary(InputStream inputStream) throws IOException {
         DataInputStream dis = null;
@@ -196,6 +196,7 @@ public class CheckpointManager {
      * Returns a {@link StoredBlock} representing the last checkpoint before the given time, for example, normally
      * you would want to know the checkpoint before the earliest wallet birthday.
      */
+  /*
     public StoredBlock getCheckpointBefore(long timeSecs) {
         try {
             checkArgument(timeSecs > params.getGenesisBlock().getTimeSeconds());
@@ -210,14 +211,14 @@ public class CheckpointManager {
     }
 
     /** Returns the number of checkpoints that were loaded. */
-    public int numCheckpoints() {
-        return checkpoints.size();
-    }
+    // public int numCheckpoints() {
+      //  return checkpoints.size();
+  //  }
 
     /** Returns a hash of the concatenated checkpoint data. */
-    public Sha256Hash getDataHash() {
-        return dataHash;
-    }
+  //  public Sha256Hash getDataHash() {
+    //    return dataHash;
+  //  }
 
     /**
      * <p>Convenience method that creates a CheckpointManager, loads the given data, gets the checkpoint for the given
