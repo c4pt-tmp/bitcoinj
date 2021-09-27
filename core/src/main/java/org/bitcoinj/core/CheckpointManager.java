@@ -107,7 +107,7 @@ public class CheckpointManager {
         else if (first == TEXTUAL_MAGIC.charAt(0))
             dataHash = readTextual(inputStream);
         else
-            System.out.println("this would have thrown an exception to not read the checkpoint file with checkpointmanager.java");
+         //   System.out.println("this would have thrown an exception to not read the checkpoint file with checkpointmanager.java");
             throw new IOException("Unsupported format.");
     }
 
