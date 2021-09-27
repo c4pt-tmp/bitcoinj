@@ -43,10 +43,10 @@ import java.util.Locale;
  */
 public class VersionMessage extends Message {
 
-    /** The version of this library release, as a string. */
-    public static final String BITCOINJ_VERSION = "0.15.8.bisq.13";
+     /** The version of this library release, as a string. */
+    public static final String BITCOINJ_VERSION = "radioX-6.0.0";
     /** The value that is prepended to the subVer field of this application. */
-    public static final String LIBRARY_SUBVER = "/bitcoinj:" + BITCOINJ_VERSION + "/";
+    public static final String LIBRARY_SUBVER = "/Shibetoshi-RadioX:" + BITCOINJ_VERSION + "/";
 
     /** A service bit that denotes whether the peer has a full copy of the block chain or not. */
     public static final int NODE_NETWORK = 1 << 0;
