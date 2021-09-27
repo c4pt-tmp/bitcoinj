@@ -1,6 +1,6 @@
 /*
  * Copyright 2013 Google Inc.
- * Copyright 2018 Andreas Schildbach
+ * Copyright 2014 Andreas Schildbach
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,58 +17,64 @@
 
 package org.bitcoinj.params;
 
+import java.math.BigInteger;
+import java.net.URI;
+import java.util.Date;
+
 import org.bitcoinj.core.Block;
-import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.Utils;
+import org.bitcoinj.core.VerificationException;
+import org.bitcoinj.net.discovery.HttpDiscovery;
+import org.bitcoinj.store.BlockStore;
+import org.bitcoinj.store.BlockStoreException;
 
 import static com.google.common.base.Preconditions.checkState;
 
 /**
- * Network parameters for the regression test mode of bitcoind in which all blocks are trivially solvable.
+ * Parameters for the testnet, a separate public instance of Bitcoin that has relaxed rules suitable for development
+ * and testing of applications and new Bitcoin versions.
  */
 public class RegTestParams extends AbstractBitcoinNetParams {
-    private static final long GENESIS_TIME = 1296688602;
-    private static final long GENESIS_NONCE = 2;
-    private static final Sha256Hash GENESIS_HASH = Sha256Hash.wrap("1b38af7fac04373a2619b6f0e8f2fc73f45380fb98bef338b41fb64e893b9cd2");
-
+      public static final int TESTNET_MAJORITY_WINDOW = 1000;
+    public static final int TESTNET_MAJORITY_REJECT_BLOCK_OUTDATED = 950;
+    public static final int TESTNET_MAJORITY_ENFORCE_BLOCK_UPGRADE = 750;
     public RegTestParams() {
-        super();
+    super();
         id = ID_REGTEST;
-        
-        targetTimespan = TARGET_TIMESPAN;
-        maxTarget = Utils.decodeCompactBits(Block.EASIEST_DIFFICULTY_TARGET);
-        // Difficulty adjustments are disabled for regtest.
-        // By setting the block interval for difficulty adjustments to Integer.MAX_VALUE we make sure difficulty never
-        // changes.
-        interval = Integer.MAX_VALUE;
-        subsidyDecreaseBlockCount = 150;
+         packetMagic = 0xfabfb5da;
 
-        port = 18444;
-        packetMagic = 0xfabfb5daL;
-        dumpedPrivateKeyHeader = 239;
+        maxTarget = Utils.decodeCompactBits(0x207fffffL);
+        port = 9888;
         addressHeader = 111;
         p2shHeader = 196;
-       // segwitAddressHrp = "bcrt";
-        spendableCoinbaseDepth = 60;
-        bip32HeaderP2PKHpub = 0x043587cf; // The 4 byte header that serializes in base58 to "tpub".
-        bip32HeaderP2PKHpriv = 0x04358394; // The 4 byte header that serializes in base58 to "tprv"
-       
-        
-        // bip32HeaderP2WPKHpub = 0x045f1cf6; // The 4 byte header that serializes in base58 to "vpub".
-       // bip32HeaderP2WPKHpriv = 0x045f18bc; // The 4 byte header that serializes in base58 to "vprv"
+        dumpedPrivateKeyHeader = 239;
+       // segwitAddressHrp = "rart";
+        genesisBlock.setTime(1296688602L);
+        genesisBlock.setDifficultyTarget(0x207fffffL);
+        genesisBlock.setNonce(2);
+        spendableCoinbaseDepth = 10;
+        subsidyDecreaseBlockCount = 100000;
+        String genesisHash = genesisBlock.getHashAsString();
+        checkState(genesisHash.equals("1b38af7fac04373a2619b6f0e8f2fc73f45380fb98bef338b41fb64e893b9cd2"));
 
-        majorityEnforceBlockUpgrade = MainNetParams.MAINNET_MAJORITY_ENFORCE_BLOCK_UPGRADE;
-        majorityRejectBlockOutdated = MainNetParams.MAINNET_MAJORITY_REJECT_BLOCK_OUTDATED;
-        majorityWindow = MainNetParams.MAINNET_MAJORITY_WINDOW;
+        majorityEnforceBlockUpgrade = TESTNET_MAJORITY_ENFORCE_BLOCK_UPGRADE;
+        majorityRejectBlockOutdated = TESTNET_MAJORITY_REJECT_BLOCK_OUTDATED;
+        majorityWindow = TESTNET_MAJORITY_WINDOW;
 
-        dnsSeeds = null;
-        addrSeeds = null;
+        dnsSeeds = new String[] {
+            "testseed.jrn.me.uk"
+        };
+        // Note this is the same as the BIP32 testnet, as BIP44 makes HD wallets
+        // chain agnostic. Dogecoin mainnet has its own headers for legacy reasons.
+        bip32HeaderP2PKHpub = 0x043587CF;
+        bip32HeaderP2PKHpriv = 0x04358394;
     }
 
-    @Override
-    public boolean allowEmptyPeerChain() {
-        return true;
-    }
+      
+    
 
     private static RegTestParams instance;
     public static synchronized RegTestParams get() {
@@ -79,21 +85,42 @@ public class RegTestParams extends AbstractBitcoinNetParams {
     }
 
     @Override
-    public Block getGenesisBlock() {
-        synchronized (GENESIS_HASH) {
-            if (genesisBlock == null) {
-                genesisBlock = Block.createGenesis(this);
-                genesisBlock.setDifficultyTarget(Block.EASIEST_DIFFICULTY_TARGET);
-                genesisBlock.setTime(GENESIS_TIME);
-                genesisBlock.setNonce(GENESIS_NONCE);
-                checkState(genesisBlock.getHash().equals(GENESIS_HASH), "Invalid genesis hash");
-            }
-        }
-        return genesisBlock;
-    }
-
-    @Override
     public String getPaymentProtocolId() {
         return PAYMENT_PROTOCOL_ID_REGTEST;
+    }
+
+    // February 16th 2012
+    private static final Date testnetDiffDate = new Date(1329264000000L);
+
+    @Override
+    public void checkDifficultyTransitions(final StoredBlock storedPrev, final Block nextBlock,
+        final BlockStore blockStore) throws VerificationException, BlockStoreException {
+        if (!isDifficultyTransitionPoint(storedPrev.getHeight()) && nextBlock.getTime().after(testnetDiffDate)) {
+            Block prev = storedPrev.getHeader();
+
+            // After 15th February 2012 the rules on the testnet change to avoid people running up the difficulty
+            // and then leaving, making it too hard to mine a block. On non-difficulty transition points, easy
+            // blocks are allowed if there has been a span of 20 minutes without one.
+            final long timeDelta = nextBlock.getTimeSeconds() - prev.getTimeSeconds();
+            // There is an integer underflow bug in bitcoin-qt that means mindiff blocks are accepted when time
+            // goes backwards.
+            if (timeDelta >= 0 && timeDelta <= NetworkParameters.TARGET_SPACING * 2) {
+                // Walk backwards until we find a block that doesn't have the easiest proof of work, then check
+                // that difficulty is equal to that one.
+                StoredBlock cursor = storedPrev;
+                while (!cursor.getHeader().equals(getGenesisBlock()) &&
+                           cursor.getHeight() % getInterval() != 0 &&
+                           cursor.getHeader().getDifficultyTargetAsInteger().equals(getMaxTarget()))
+                        cursor = cursor.getPrev(blockStore);
+                BigInteger cursorTarget = cursor.getHeader().getDifficultyTargetAsInteger();
+                BigInteger newTarget = nextBlock.getDifficultyTargetAsInteger();
+                if (!cursorTarget.equals(newTarget))
+                        throw new VerificationException("RegTest block transition that is not allowed: " +
+                        Long.toHexString(cursor.getHeader().getDifficultyTarget()) + " vs " +
+                        Long.toHexString(nextBlock.getDifficultyTarget()));
+            }
+        } else {
+            super.checkDifficultyTransitions(storedPrev, nextBlock, blockStore);
+        }
     }
 }
