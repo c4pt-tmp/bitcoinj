@@ -79,7 +79,7 @@ public class RegTestParams extends AbstractBitcoinNetParams {
                 genesis.setNonce(2);
                 genesis.setDifficultyTarget(0x207fFFFFL);
                 genesis.setTime(1296688602L);
-                checkState(genesis.getHashAsString().toLowerCase().equals("0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"));
+                checkState(genesis.getHashAsString().toLowerCase().equals("1b38af7fac04373a2619b6f0e8f2fc73f45380fb98bef338b41fb64e893b9cd2"));
             }
             return genesis;
         }
