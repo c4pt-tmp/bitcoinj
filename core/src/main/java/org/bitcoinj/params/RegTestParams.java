@@ -18,8 +18,8 @@
 package org.bitcoinj.params;
 
 import org.bitcoinj.core.Block;
-
-import java.math.BigInteger;
+import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.Utils;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -27,20 +27,42 @@ import static com.google.common.base.Preconditions.checkState;
  * Network parameters for the regression test mode of bitcoind in which all blocks are trivially solvable.
  */
 public class RegTestParams extends AbstractBitcoinNetParams {
-    private static final BigInteger MAX_TARGET = new BigInteger("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
+    private static final long GENESIS_TIME = 1296688602;
+    private static final long GENESIS_NONCE = 2;
+    private static final Sha256Hash GENESIS_HASH = Sha256Hash.wrap("1b38af7fac04373a2619b6f0e8f2fc73f45380fb98bef338b41fb64e893b9cd2");
 
     public RegTestParams() {
-super();
-        // Difficulty adjustments are disabled for regtest.
-        // By setting the block interval for difficulty adjustments to Integer.MAX_VALUE we make sure difficulty never changes.
-        interval = Integer.MAX_VALUE;
-        maxTarget = MAX_TARGET;
-        subsidyDecreaseBlockCount = 150;
-        port = 18444;
+        super();
         id = ID_REGTEST;
-        packetMagic = 0xfabfb5da;
-        addressHeader = 111;
+        
+        targetTimespan = TARGET_TIMESPAN;
+        maxTarget = Utils.decodeCompactBits(Block.EASIEST_DIFFICULTY_TARGET);
+        // Difficulty adjustments are disabled for regtest.
+        // By setting the block interval for difficulty adjustments to Integer.MAX_VALUE we make sure difficulty never
+        // changes.
+        interval = Integer.MAX_VALUE;
+        subsidyDecreaseBlockCount = 150;
+
+        port = 18444;
+        packetMagic = 0xfabfb5daL;
         dumpedPrivateKeyHeader = 239;
+        addressHeader = 111;
+        p2shHeader = 196;
+       // segwitAddressHrp = "bcrt";
+        spendableCoinbaseDepth = 60;
+        bip32HeaderP2PKHpub = 0x043587cf; // The 4 byte header that serializes in base58 to "tpub".
+        bip32HeaderP2PKHpriv = 0x04358394; // The 4 byte header that serializes in base58 to "tprv"
+       
+        
+        // bip32HeaderP2WPKHpub = 0x045f1cf6; // The 4 byte header that serializes in base58 to "vpub".
+       // bip32HeaderP2WPKHpriv = 0x045f18bc; // The 4 byte header that serializes in base58 to "vprv"
+
+        majorityEnforceBlockUpgrade = MainNetParams.MAINNET_MAJORITY_ENFORCE_BLOCK_UPGRADE;
+        majorityRejectBlockOutdated = MainNetParams.MAINNET_MAJORITY_REJECT_BLOCK_OUTDATED;
+        majorityWindow = MainNetParams.MAINNET_MAJORITY_WINDOW;
+
+        dnsSeeds = null;
+        addrSeeds = null;
     }
 
     @Override
@@ -48,26 +70,7 @@ super();
         return true;
     }
 
-    private static Block genesis;
-
-    @Override
-    public Block getGenesisBlock() {
-        synchronized (RegTestParams.class) {
-            if (genesis == null) {
-                genesis = super.getGenesisBlock();
-                genesis.setNonce(2);
-                genesis.setDifficultyTarget(0x207fffffL);
-                genesis.setTime(1296688602L);
-                checkState(genesis.getVersion() == 1);
-                checkState(genesis.getHashAsString().toLowerCase().equals("1b38af7fac04373a2619b6f0e8f2fc73f45380fb98bef338b41fb64e893b9cd2"));
-                genesis.verifyHeader();
-            }
-            return genesis;
-        }
-    }
-
     private static RegTestParams instance;
-
     public static synchronized RegTestParams get() {
         if (instance == null) {
             instance = new RegTestParams();
@@ -76,26 +79,21 @@ super();
     }
 
     @Override
+    public Block getGenesisBlock() {
+        synchronized (GENESIS_HASH) {
+            if (genesisBlock == null) {
+                genesisBlock = Block.createGenesis(this);
+                genesisBlock.setDifficultyTarget(Block.EASIEST_DIFFICULTY_TARGET);
+                genesisBlock.setTime(GENESIS_TIME);
+                genesisBlock.setNonce(GENESIS_NONCE);
+                checkState(genesisBlock.getHash().equals(GENESIS_HASH), "Invalid genesis hash");
+            }
+        }
+        return genesisBlock;
+    }
+
+    @Override
     public String getPaymentProtocolId() {
         return PAYMENT_PROTOCOL_ID_REGTEST;
     }
-
-    @Override
-    /** the testnet rules don't work for regtest, where difficulty stays the same */
-    public long calculateNewDifficultyTarget(StoredBlock storedPrev, Block nextBlock, BlockStore blockStore)
-            throws VerificationException, BlockStoreException {
-        final Block prev = storedPrev.getHeader();
-        return prev.getDifficultyTarget();
-    }
-
-    @Override
-    public boolean allowMinDifficultyBlocks() {
-        return false;
-    }
-
-    @Override
-    public boolean isTestNet() {
-        return false;
-    }
 }
-
