@@ -63,6 +63,9 @@ import java.util.Comparator;
 
 import static com.google.common.base.Preconditions.*;
 
+// TODO: Move this class to tracking compression state itself.
+// The Bouncy Castle developers are deprecating their own tracking of the compression state.
+
 /**
  * <p>Represents an elliptic curve public and (optionally) private key, usable for digital signatures but not encryption.
  * Creating a new ECKey with the empty constructor will generate a new random keypair. Other static methods can be used
@@ -177,12 +180,12 @@ public class ECKey implements EncryptableItem {
         ECPrivateKeyParameters privParams = (ECPrivateKeyParameters) keypair.getPrivate();
         ECPublicKeyParameters pubParams = (ECPublicKeyParameters) keypair.getPublic();
         priv = privParams.getD();
-        pub = getPointWithCompression(pubParams.getQ(), true);
+        pub = new LazyECPoint(CURVE.getCurve(), pubParams.getQ().getEncoded(true));
         creationTimeSeconds = Utils.currentTimeSeconds();
     }
 
-    protected ECKey(@Nullable BigInteger priv, ECPoint pub, boolean compressed) {
-        this(priv, getPointWithCompression(checkNotNull(pub), compressed));
+    protected ECKey(@Nullable BigInteger priv, ECPoint pub) {
+        this(priv, new LazyECPoint(checkNotNull(pub)));
     }
 
     protected ECKey(@Nullable BigInteger priv, LazyECPoint pub) {
@@ -202,20 +205,33 @@ public class ECKey implements EncryptableItem {
      * Utility for compressing an elliptic curve point. Returns the same point if it's already compressed.
      * See the ECKey class docs for a discussion of point compression.
      */
+    public static ECPoint compressPoint(ECPoint point) {
+        return getPointWithCompression(point, true);
+    }
+
     public static LazyECPoint compressPoint(LazyECPoint point) {
-        return point.isCompressed() ? point : getPointWithCompression(point.get(), true);
+        return point.isCompressed() ? point : new LazyECPoint(compressPoint(point.get()));
     }
 
     /**
-     * Utility for decompressing an elliptic curve point. Returns the same point if it's already uncompressed.
+     * Utility for decompressing an elliptic curve point. Returns the same point if it's already compressed.
      * See the ECKey class docs for a discussion of point compression.
      */
-    public static LazyECPoint decompressPoint(LazyECPoint point) {
-        return !point.isCompressed() ? point : getPointWithCompression(point.get(), false);
+    public static ECPoint decompressPoint(ECPoint point) {
+        return getPointWithCompression(point, false);
     }
 
-    private static LazyECPoint getPointWithCompression(ECPoint point, boolean compressed) {
-        return new LazyECPoint(point, compressed);
+    public static LazyECPoint decompressPoint(LazyECPoint point) {
+        return !point.isCompressed() ? point : new LazyECPoint(decompressPoint(point.get()));
+    }
+
+    private static ECPoint getPointWithCompression(ECPoint point, boolean compressed) {
+      if (point.isCompressed() == compressed)
+          return point;
+      point = point.normalize();
+      BigInteger x = point.getAffineXCoord().toBigInteger();
+      BigInteger y = point.getAffineYCoord().toBigInteger();
+      return CURVE.getCurve().createPoint(x, y, compressed);
     }
 
     /**
@@ -235,8 +251,8 @@ public class ECKey implements EncryptableItem {
     }
 
     /**
-     * Creates an ECKey given the private key only. The public key is calculated from it (this is slow).
-     * @param compressed Determines whether the resulting ECKey will use a compressed encoding for the public key.
+     * Creates an ECKey given the private key only. The public key is calculated from it (this is slow), either
+     * compressed or not.
      */
     public static ECKey fromPrivate(BigInteger privKey, boolean compressed) {
         ECPoint point = publicPointFromPrivate(privKey);
@@ -252,8 +268,8 @@ public class ECKey implements EncryptableItem {
     }
 
     /**
-     * Creates an ECKey given the private key only. The public key is calculated from it (this is slow).
-     * @param compressed Determines whether the resulting ECKey will use a compressed encoding for the public key.
+     * Creates an ECKey given the private key only. The public key is calculated from it (this is slow), either
+     * compressed or not.
      */
     public static ECKey fromPrivate(byte[] privKeyBytes, boolean compressed) {
         return fromPrivate(new BigInteger(1, privKeyBytes), compressed);
@@ -262,11 +278,10 @@ public class ECKey implements EncryptableItem {
     /**
      * Creates an ECKey that simply trusts the caller to ensure that point is really the result of multiplying the
      * generator point by the private key. This is used to speed things up when you know you have the right values
-     * already.
-     * @param compressed Determines whether the resulting ECKey will use a compressed encoding for the public key.
+     * already. The compression state of pub will be preserved.
      */
-    public static ECKey fromPrivateAndPrecalculatedPublic(BigInteger priv, ECPoint pub, boolean compressed) {
-        return new ECKey(priv, pub, compressed);
+    public static ECKey fromPrivateAndPrecalculatedPublic(BigInteger priv, ECPoint pub) {
+        return new ECKey(priv, pub);
     }
 
     /**
@@ -277,15 +292,15 @@ public class ECKey implements EncryptableItem {
     public static ECKey fromPrivateAndPrecalculatedPublic(byte[] priv, byte[] pub) {
         checkNotNull(priv);
         checkNotNull(pub);
-        return new ECKey(new BigInteger(1, priv), new LazyECPoint(CURVE.getCurve(), pub));
+        return new ECKey(new BigInteger(1, priv), CURVE.getCurve().decodePoint(pub));
     }
 
     /**
-     * Creates an ECKey that cannot be used for signing, only verifying signatures, from the given point.
-     * @param compressed Determines whether the resulting ECKey will use a compressed encoding for the public key.
+     * Creates an ECKey that cannot be used for signing, only verifying signatures, from the given point. The
+     * compression state of pub will be preserved.
      */
-    public static ECKey fromPublicOnly(ECPoint pub, boolean compressed) {
-        return new ECKey(null, pub, compressed);
+    public static ECKey fromPublicOnly(ECPoint pub) {
+        return new ECKey(null, pub);
     }
 
     /**
@@ -293,11 +308,7 @@ public class ECKey implements EncryptableItem {
      * The compression state of pub will be preserved.
      */
     public static ECKey fromPublicOnly(byte[] pub) {
-        return new ECKey(null, new LazyECPoint(CURVE.getCurve(), pub));
-    }
-
-    public static ECKey fromPublicOnly(ECKey key) {
-        return fromPublicOnly(key.getPubKeyPoint(), key.isCompressed());
+        return new ECKey(null, CURVE.getCurve().decodePoint(pub));
     }
 
     /**
@@ -308,7 +319,7 @@ public class ECKey implements EncryptableItem {
         if (!pub.isCompressed())
             return this;
         else
-            return new ECKey(priv, getPointWithCompression(pub.get(), false));
+            return new ECKey(priv, decompressPoint(pub.get()));
     }
 
     /**
@@ -363,7 +374,8 @@ public class ECKey implements EncryptableItem {
         if (pubKey == null) {
             // Derive public from private.
             ECPoint point = publicPointFromPrivate(privKey);
-            this.pub = getPointWithCompression(point, compressed);
+            point = getPointWithCompression(point, compressed);
+            this.pub = new LazyECPoint(point);
         } else {
             // We expect the pubkey to be in regular encoded form, just as a BigInteger. Therefore the first byte is
             // a special marker byte.
@@ -795,18 +807,6 @@ public class ECKey implements EncryptableItem {
         return true;
     }
 
-    /**
-     * Returns true if the given pubkey is in its compressed form.
-     */
-    public static boolean isPubKeyCompressed(byte[] encoded) {
-        if (encoded.length == 33 && (encoded[0] == 0x02 || encoded[0] == 0x03))
-            return true;
-        else if (encoded.length == 65 && encoded[0] == 0x04)
-            return false;
-        else
-            throw new IllegalArgumentException(Utils.HEX.encode(encoded));
-    }
-
     private static ECKey extractKeyFromASN1(byte[] asn1privkey) {
         // To understand this code, see the definition of the ASN.1 format for EC private keys in the OpenSSL source
         // code in ec_asn1.c:
@@ -841,8 +841,8 @@ public class ECKey implements EncryptableItem {
             checkArgument(encoding >= 2 && encoding <= 4, "Input has 'publicKey' with invalid encoding");
 
             // Now sanity check to ensure the pubkey bytes match the privkey.
-            boolean compressed = isPubKeyCompressed(pubbits);
-            ECKey key = new ECKey(privkey, (byte[]) null, compressed);
+            boolean compressed = (pubbits.length == 33);
+            ECKey key = new ECKey(privkey, null, compressed);
             if (!Arrays.equals(key.getPubKey(), pubbits))
                 throw new IllegalArgumentException("Public key in ASN.1 structure does not match private key.");
             return key;
@@ -1025,7 +1025,7 @@ public class ECKey implements EncryptableItem {
         BigInteger srInv = rInv.multiply(sig.s).mod(n);
         BigInteger eInvrInv = rInv.multiply(eInv).mod(n);
         ECPoint q = ECAlgorithms.sumOfTwoMultiplies(CURVE.getG(), eInvrInv, R, srInv);
-        return ECKey.fromPublicOnly(q, compressed);
+        return ECKey.fromPublicOnly(q.getEncoded(compressed));
     }
 
     /** Decompress a compressed public key (x co-ord and low-bit of y-coord). */
@@ -1110,7 +1110,9 @@ public class ECKey implements EncryptableItem {
         if (unencryptedPrivateKey.length != 32)
             throw new KeyCrypterException.InvalidCipherText(
                     "Decrypted key must be 32 bytes long, but is " + unencryptedPrivateKey.length);
-        ECKey key = ECKey.fromPrivate(unencryptedPrivateKey, isCompressed());
+        ECKey key = ECKey.fromPrivate(unencryptedPrivateKey);
+        if (!isCompressed())
+            key = key.decompress();
         if (!Arrays.equals(key.getPubKey(), getPubKey()))
             throw new KeyCrypterException("Provided AES key is wrong");
         key.setCreationTimeSeconds(creationTimeSeconds);

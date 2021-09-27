@@ -262,6 +262,10 @@ public class WalletProtobufSerializer {
             txBuilder.setUpdatedAt(tx.getUpdateTime().getTime());
         }
 
+        if (tx.getIncludedInBestChainAt() != null) {
+            txBuilder.setIncludedInBestChainAt(tx.getIncludedInBestChainAt().getTime());
+        }
+
         if (tx.getLockTime() > 0) {
             txBuilder.setLockTime((int)tx.getLockTime());
         }
@@ -385,9 +389,10 @@ public class WalletProtobufSerializer {
 
         for (PeerAddress address : confidence.getBroadcastBy()) {
             Protos.PeerAddress proto = Protos.PeerAddress.newBuilder()
-                    .setIpAddress(ByteString.copyFrom(address.getAddr().getAddress()))
+                    .setIpAddress(ByteString.copyFrom(address.getAddr() != null ? address.getAddr().getAddress() : new byte[]{}))
                     .setPort(address.getPort())
                     .setServices(address.getServices().longValue())
+                    .setHostname(address.getHostname() != null ? address.getHostname() : "")
                     .build();
             confidenceBuilder.addBroadcastBy(proto);
         }
@@ -631,6 +636,10 @@ public class WalletProtobufSerializer {
             tx.setUpdateTime(new Date(txProto.getUpdatedAt()));
         }
 
+        if (txProto.hasIncludedInBestChainAt()) {
+            tx.setIncludedInBestChainAt(new Date(txProto.getIncludedInBestChainAt()));
+        }
+
         for (Protos.TransactionOutput outputProto : txProto.getTransactionOutputList()) {
             Coin value = Coin.valueOf(outputProto.getValue());
             byte[] scriptBytes = outputProto.getScriptBytes().toByteArray();
@@ -802,16 +811,24 @@ public class WalletProtobufSerializer {
             confidence.setOverridingTransaction(overridingTransaction);
         }
         for (Protos.PeerAddress proto : confidenceProto.getBroadcastByList()) {
-            InetAddress ip;
-            try {
-                ip = InetAddress.getByAddress(proto.getIpAddress().toByteArray());
-            } catch (UnknownHostException e) {
-                throw new UnreadableWalletException("Peer IP address does not have the right length", e);
+            InetAddress ip = null;
+            if (proto.getIpAddress().toByteArray().length != 0) {
+                try {
+                    ip = InetAddress.getByAddress(proto.getIpAddress().toByteArray());
+                } catch (UnknownHostException e) {
+                    throw new UnreadableWalletException("Peer IP address does not have the right length", e);
+                }
             }
             int port = proto.getPort();
             int protocolVersion = params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.CURRENT);
             BigInteger services = BigInteger.valueOf(proto.getServices());
-            PeerAddress address = new PeerAddress(params, ip, port, protocolVersion, services);
+            String hostname = proto.hasHostname() ? proto.getHostname() : "";
+            PeerAddress address;
+            if (ip != null) {
+                address = new PeerAddress(params, ip, port, protocolVersion, services);
+            } else {
+                address = new PeerAddress(params, hostname, port, protocolVersion, services);
+            }
             confidence.markBroadcastBy(address);
         }
         if (confidenceProto.hasLastBroadcastedAt())

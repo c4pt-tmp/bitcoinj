@@ -141,7 +141,9 @@ public class TransactionBroadcast {
             // a big effect.
             List<Peer> peers = peerGroup.getConnectedPeers();    // snapshots
             // Prepare to send the transaction by adding a listener that'll be called when confidence changes.
-            tx.getConfidence().addEventListener(new ConfidenceChange());
+            // Only bother with this if we might actually hear back:
+            if (minConnections > 1)
+                tx.getConfidence().addEventListener(new ConfidenceChange());
             // Bitcoin Core sends an inv in this case and then lets the peer request the tx data. We just
             // blast out the TX here for a couple of reasons. Firstly it's simpler: in the case where we have
             // just a single connection we don't have to wait for getdata to be received and handled before
@@ -160,6 +162,12 @@ public class TransactionBroadcast {
             for (final Peer peer : peers) {
                 try {
                     ListenableFuture future = peer.sendMessage(tx);
+                    // Peer drop after broadcast feature disabled until we better understand why this feature was
+                    // implemented.
+                    // If several txs are broadcasted in a short period of time, we may disconnect many peers
+                    // quickly, then making the connection to the bitcoin network unstable and have a risk a
+                    // tx is not broadcasted at all.
+                    dropPeersAfterBroadcast = false;
                     if (dropPeersAfterBroadcast) {
                         // We drop the peer shortly after the transaction has been sent, because this peer will not
                         // send us back useful broadcast confirmations.
@@ -176,6 +184,14 @@ public class TransactionBroadcast {
                 } catch (Exception e) {
                     log.error("Caught exception sending to {}", peer, e);
                 }
+            }
+            // If we've been limited to talk to only one peer, we can't wait to hear back because the
+            // remote peer won't tell us about transactions we just announced to it for obvious reasons.
+            // So we just have to assume we're done, at that point. This happens when we're not given
+            // any peer discovery source and the user just calls connectTo() once.
+            if (minConnections == 1) {
+                peerGroup.removePreMessageReceivedEventListener(rejectionListener);
+                future.set(tx);
             }
         }
     }

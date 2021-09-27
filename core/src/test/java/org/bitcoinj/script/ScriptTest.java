@@ -91,7 +91,7 @@ public class ScriptTest {
         Script script = ScriptBuilder.createMultiSigOutputScript(3, keys);
         assertTrue(ScriptPattern.isSentToMultisig(script));
         List<ECKey> pubkeys = new ArrayList<>(3);
-        for (ECKey key : keys) pubkeys.add(ECKey.fromPublicOnly(key));
+        for (ECKey key : keys) pubkeys.add(ECKey.fromPublicOnly(key.getPubKeyPoint()));
         assertEquals(script.getPubKeys(), pubkeys);
         assertFalse(ScriptPattern.isSentToMultisig(ScriptBuilder.createP2PKOutputScript(new ECKey())));
         try {

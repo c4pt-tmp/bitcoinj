@@ -412,7 +412,7 @@ public class BasicKeyChain implements EncryptableKeyChain {
         addEventListener(new ListenerRegistration<>(listener, executor));
     }
 
-    /* package private */ void addEventListener(ListenerRegistration<KeyChainEventListener> listener) {
+    public void addEventListener(ListenerRegistration<KeyChainEventListener> listener) {
         listeners.add(listener);
     }
 
@@ -481,7 +481,7 @@ public class BasicKeyChain implements EncryptableKeyChain {
                 encrypted.importKeyLocked(encryptedKey);
             }
             for (ListenerRegistration<KeyChainEventListener> listener : listeners) {
-                encrypted.addEventListener(listener);
+                encrypted.listeners.add(listener);
             }
             return encrypted;
         } finally {
@@ -509,7 +509,7 @@ public class BasicKeyChain implements EncryptableKeyChain {
                 decrypted.importKeyLocked(key.decrypt(aesKey));
             }
             for (ListenerRegistration<KeyChainEventListener> listener : listeners) {
-                decrypted.addEventListener(listener);
+                decrypted.listeners.add(listener);
             }
             return decrypted;
         } finally {

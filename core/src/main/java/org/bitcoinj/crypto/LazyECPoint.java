@@ -16,7 +16,6 @@
 
 package org.bitcoinj.crypto;
 
-import org.bitcoinj.core.ECKey;
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECPoint;
@@ -37,7 +36,6 @@ public class LazyECPoint {
 
     private final ECCurve curve;
     private final byte[] bits;
-    private final boolean compressed;
 
     // This field is effectively final - once set it won't change again. However it can be set after
     // construction.
@@ -47,12 +45,10 @@ public class LazyECPoint {
     public LazyECPoint(ECCurve curve, byte[] bits) {
         this.curve = curve;
         this.bits = bits;
-        this.compressed = ECKey.isPubKeyCompressed(bits);
     }
 
-    public LazyECPoint(ECPoint point, boolean compressed) {
-        this.point = checkNotNull(point).normalize();
-        this.compressed = compressed;
+    public LazyECPoint(ECPoint point) {
+        this.point = checkNotNull(point);
         this.curve = null;
         this.bits = null;
     }
@@ -63,17 +59,17 @@ public class LazyECPoint {
         return point;
     }
 
-    public byte[] getEncoded() {
-        if (bits != null)
-            return Arrays.copyOf(bits, bits.length);
-        else
-            return get().getEncoded(compressed);
-    }
-
     // Delegated methods.
 
     public ECPoint getDetachedPoint() {
         return get().getDetachedPoint();
+    }
+
+    public byte[] getEncoded() {
+        if (bits != null)
+            return Arrays.copyOf(bits, bits.length);
+        else
+            return get().getEncoded();
     }
 
     public boolean isInfinity() {
@@ -97,7 +93,10 @@ public class LazyECPoint {
     }
 
     public boolean isCompressed() {
-        return compressed;
+        if (bits != null)
+            return bits[0] == 2 || bits[0] == 3;
+        else
+            return get().isCompressed();
     }
 
     public ECPoint multiply(BigInteger k) {

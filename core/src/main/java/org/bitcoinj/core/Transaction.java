@@ -136,6 +136,10 @@ public class Transaction extends ChildMessage {
     // list of transactions from a wallet, which is helpful for presenting to users.
     private Date updatedAt;
 
+    // Date of the block that includes this transaction on the best chain
+    @Nullable
+    private Date includedInBestChainAt;
+
     // These are in memory helpers only. They contain the transaction hashes without and with witness.
     private Sha256Hash cachedTxId;
     private Sha256Hash cachedWTxId;
@@ -309,6 +313,29 @@ public class Transaction extends ChildMessage {
         return cachedWTxId;
     }
 
+    /** Gets the transaction weight as defined in BIP141. */
+    public int getWeight() {
+        if (!hasWitnesses())
+            return getMessageSize() * 4;
+        try (final ByteArrayOutputStream stream = new UnsafeByteArrayOutputStream(length)) {
+            bitcoinSerializeToStream(stream, false);
+            final int baseSize = stream.size();
+            stream.reset();
+            bitcoinSerializeToStream(stream, true);
+            final int totalSize = stream.size();
+            return baseSize * 3 + totalSize;
+        } catch (IOException e) {
+            throw new RuntimeException(e); // cannot happen
+        }
+    }
+
+    /** Gets the virtual transaction size as defined in BIP141. */
+    public int getVsize() {
+        if (!hasWitnesses())
+            return getMessageSize();
+        return (getWeight() + 3) / 4; // round up
+    }
+
     /**
      * Gets the sum of the inputs, regardless of who owns them.
      */
@@ -365,15 +392,19 @@ public class Transaction extends ChildMessage {
      * is the best chain. The best chain block is guaranteed to be called last. So this must be idempotent.</p>
      *
      * <p>Sets updatedAt to be the earliest valid block time where this tx was seen.</p>
+     * <p>Sets includedInBestChainAt to be the block time of the best chain block where this tx is included.</p>
      *
      * @param block     The {@link StoredBlock} in which the transaction has appeared.
-     * @param bestChain whether to set the updatedAt timestamp from the block header (only if not already set)
+     * @param bestChain whether the supplied block is part of the best chain.
      * @param relativityOffset A number that disambiguates the order of transactions within a block.
      */
     public void setBlockAppearance(StoredBlock block, boolean bestChain, int relativityOffset) {
         long blockTime = block.getHeader().getTimeSeconds() * 1000;
         if (bestChain && (updatedAt == null || updatedAt.getTime() == 0 || updatedAt.getTime() > blockTime)) {
             updatedAt = new Date(blockTime);
+        }
+        if (bestChain) {
+            includedInBestChainAt = new Date(blockTime);
         }
 
         addBlockAppearance(block.getHeader().getHash(), relativityOffset);
@@ -515,6 +546,15 @@ public class Transaction extends ChildMessage {
         this.updatedAt = updatedAt;
     }
 
+    @Nullable
+    public Date getIncludedInBestChainAt() {
+        return includedInBestChainAt;
+    }
+
+    public void setIncludedInBestChainAt(Date includedInBestChainAt) {
+        this.includedInBestChainAt = includedInBestChainAt;
+    }
+
     /**
      * These constants are a part of a scriptSig signature on the inputs. They define the details of how a
      * transaction can be redeemed, specifically, they control how the hash of the transaction is calculated.
@@ -556,6 +596,7 @@ public class Transaction extends ChildMessage {
         super.unCache();
         cachedTxId = null;
         cachedWTxId = null;
+        confidence = null;
     }
 
     protected static int calcLength(byte[] buf, int offset) {
@@ -745,10 +786,20 @@ public class Transaction extends ChildMessage {
         if (!wTxId.equals(txId))
             s.append(", wtxid ").append(wTxId);
         s.append('\n');
+        int weight = getWeight();
+        int size = unsafeBitcoinSerialize().length;
+        int vsize = getVsize();
+        s.append(indent).append("weight: ").append(weight).append(" wu, ");
+        if (size != vsize)
+            s.append(vsize).append(" virtual bytes, ");
+        s.append(size).append(" bytes\n");
         if (updatedAt != null)
             s.append(indent).append("updated: ").append(Utils.dateTimeFormat(updatedAt)).append('\n');
+        if (includedInBestChainAt != null)
+            s.append(indent).append("included in best chain at: ").append(Utils.dateTimeFormat(includedInBestChainAt)).append('\n');
         if (version != 1)
             s.append(indent).append("version ").append(version).append('\n');
+
         if (isTimeLocked()) {
             s.append(indent).append("time locked until ");
             if (lockTime < LOCKTIME_THRESHOLD) {
@@ -771,8 +822,20 @@ public class Transaction extends ChildMessage {
         if (purpose != null)
             s.append(indent).append("purpose: ").append(purpose).append('\n');
         if (isCoinBase()) {
-            s.append(indent).append("coinbase\n");
-        } else if (!inputs.isEmpty()) {
+            String script;
+            String script2;
+            try {
+                script = inputs.get(0).getScriptSig().toString();
+                script2 = outputs.get(0).getScriptPubKey().toString();
+            } catch (ScriptException e) {
+                script = "???";
+                script2 = "???";
+            }
+            s.append(indent).append("   == COINBASE TXN (scriptSig ").append(script).append(")  (scriptPubKey ").append(script2)
+                    .append(")\n");
+            return s.toString();
+        }
+        if (!inputs.isEmpty()) {
             int i = 0;
             for (TransactionInput in : inputs) {
                 s.append(indent).append("   ");
@@ -782,7 +845,7 @@ public class Transaction extends ChildMessage {
                     s.append(in.getScriptSig());
                     final Coin value = in.getValue();
                     if (value != null)
-                        s.append("  ").append(value.toFriendlyString());
+                        s.append("  ").append(value.toFriendlyString()).append(" (").append(value).append(")");
                     s.append('\n');
                     if (in.hasWitness()) {
                         s.append(indent).append("        witness:");
@@ -826,8 +889,9 @@ public class Transaction extends ChildMessage {
             try {
                 Script scriptPubKey = out.getScriptPubKey();
                 s.append(scriptPubKey.getChunks().size() > 0 ? scriptPubKey.toString() : "<no scriptPubKey>");
+                s.append(" (").append(HEX.encode(scriptPubKey.getProgram())).append(")");
                 s.append("  ");
-                s.append(out.getValue().toFriendlyString());
+                s.append(out.getValue().toFriendlyString()).append(" (").append(out.getValue()).append(")");
                 s.append('\n');
                 s.append(indent).append("        ");
                 ScriptType scriptType = scriptPubKey.getScriptType();
@@ -851,9 +915,12 @@ public class Transaction extends ChildMessage {
         }
         final Coin fee = getFee();
         if (fee != null) {
-            final int size = unsafeBitcoinSerialize().length;
-            s.append(indent).append("   fee  ").append(fee.multiply(1000).divide(size).toFriendlyString()).append("/kB, ")
-                    .append(fee.toFriendlyString()).append(" for ").append(size).append(" bytes\n");
+            s.append(indent).append("   fee  ");
+            s.append(fee.multiply(1000).divide(weight).toFriendlyString()).append("/wu, ");
+            if (size != vsize)
+                s.append(fee.multiply(1000).divide(vsize).toFriendlyString()).append("/vkB, ");
+            s.append(fee.multiply(1000).divide(size).toFriendlyString()).append("/kB  ");
+            s.append(fee.toFriendlyString()).append('\n');
         }
         return s.toString();
     }
@@ -1375,6 +1442,17 @@ public class Transaction extends ChildMessage {
 
         return Sha256Hash.twiceOf(bos.toByteArray());
     }
+
+    public byte[] bitcoinSerialize(boolean segwit) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try {
+            bitcoinSerializeToStream(stream, segwit);
+        } catch (IOException e) {
+            // Cannot happen, we are serializing to a memory stream.
+        }
+        return stream.toByteArray();
+    }
+
 
     @Override
     protected void bitcoinSerializeToStream(OutputStream stream) throws IOException {

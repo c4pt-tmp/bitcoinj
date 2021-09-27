@@ -19,6 +19,7 @@ package org.bitcoinj.store;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNull;
 
 import java.io.File;
 import java.math.BigInteger;
@@ -131,7 +132,7 @@ public class SPVBlockStoreTest {
         // On slow machines, this test could fail. Then either add @Ignore or adapt the threshold and please report to
         // us.
         final int ITERATIONS = 100000;
-        final long THRESHOLD_MS = 2000;
+        final long THRESHOLD_MS = 1500;
         SPVBlockStore store = new SPVBlockStore(UNITTEST, blockStoreFile);
         Stopwatch watch = Stopwatch.createStarted();
         for (int i = 0; i < ITERATIONS; i++) {
@@ -144,6 +145,31 @@ public class SPVBlockStoreTest {
         }
         assertTrue("took " + watch + " for " + ITERATIONS + " iterations",
                 watch.elapsed(TimeUnit.MILLISECONDS) < THRESHOLD_MS);
+        store.close();
+    }
+
+    @Test
+    public void oneStoreDelete() throws Exception {
+        // Used to fail on windows
+        // See https://github.com/bitcoinj/bitcoinj/issues/1477#issuecomment-450274821
+        SPVBlockStore store = new SPVBlockStore(UNITTEST, blockStoreFile);
+        store.close();
+        assertTrue(blockStoreFile.delete());
+    }
+
+    public void clear() throws Exception {
+        SPVBlockStore store = new SPVBlockStore(UNITTEST, blockStoreFile);
+
+        // Build a new block.
+        Address to = LegacyAddress.fromKey(UNITTEST, new ECKey());
+        StoredBlock genesis = store.getChainHead();
+        StoredBlock b1 = genesis.build(genesis.getHeader().createNextBlock(to).cloneAsHeader());
+        store.put(b1);
+        store.setChainHead(b1);
+        assertEquals(b1.getHeader().getHash(), store.getChainHead().getHeader().getHash());
+        store.clear();
+        assertNull(store.get(b1.getHeader().getHash()));
+        assertEquals(UNITTEST.getGenesisBlock().getHash(), store.getChainHead().getHeader().getHash());
         store.close();
     }
 }

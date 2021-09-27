@@ -82,13 +82,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static org.bitcoinj.core.Coin.*;
 import static org.bitcoinj.core.Utils.HEX;
 import static org.bitcoinj.testing.FakeTxBuilder.*;
 import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.replay;
-import static org.hamcrest.Matchers.closeTo;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.junit.Assert.*;
 
 public class WalletTest extends TestWithWallet {
@@ -98,6 +97,7 @@ public class WalletTest extends TestWithWallet {
     private static final CharSequence WRONG_PASSWORD = "nothing noone nobody nowhere";
 
     private final Address OTHER_ADDRESS = LegacyAddress.fromKey(UNITTEST, new ECKey());
+    private final Address OTHER_SEGWIT_ADDRESS = SegwitAddress.fromKey(UNITTEST, new ECKey());
 
     @Before
     @Override
@@ -2726,8 +2726,25 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    public void witnessTransactionGetFeeTest() throws Exception {
+        Wallet mySegwitWallet = Wallet.createDeterministic(UNITTEST, Script.ScriptType.P2WPKH);
+        Address mySegwitAddress = mySegwitWallet.freshReceiveAddress(Script.ScriptType.P2WPKH);
+
+        // Prepare wallet to spend
+        StoredBlock block = new StoredBlock(makeSolvedTestBlock(blockStore, OTHER_SEGWIT_ADDRESS), BigInteger.ONE, 1);
+        Transaction tx = createFakeTx(UNITTEST, COIN, mySegwitAddress);
+        mySegwitWallet.receiveFromBlock(tx, block, AbstractBlockChain.NewBlockType.BEST_CHAIN, 0);
+
+        // Create a transaction
+        SendRequest request = SendRequest.to(OTHER_SEGWIT_ADDRESS, CENT);
+        request.feePerKb = Transaction.DEFAULT_TX_FEE;
+        mySegwitWallet.completeTx(request);
+        assertEquals(Coin.valueOf(14000), request.tx.getFee());
+    }
+
+    @Test
     public void lowerThanDefaultFee() throws InsufficientMoneyException {
-        int feeFactor = 200;
+        int feeFactor = 50;
         Coin fee = Transaction.DEFAULT_TX_FEE.divide(feeFactor);
         receiveATransactionAmount(wallet, myAddress, Coin.COIN);
         SendRequest req = SendRequest.to(myAddress, Coin.CENT);
@@ -2741,8 +2758,7 @@ public class WalletTest extends TestWithWallet {
         emptyReq.emptyWallet = true;
         emptyReq.coinSelector = AllowUnconfirmedCoinSelector.get();
         wallet.completeTx(emptyReq);
-        final Coin feePerKb = emptyReq.tx.getFee().multiply(1000).divide(emptyReq.tx.getMessageSize());
-        assertThat((double) feePerKb.value, closeTo(Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.value,20));
+        assertEquals(Transaction.REFERENCE_DEFAULT_MIN_TX_FEE, emptyReq.tx.getFee());
         wallet.commitTx(emptyReq.tx);
     }
 
@@ -3198,7 +3214,7 @@ public class WalletTest extends TestWithWallet {
     public void completeTxPartiallySigned(Wallet.MissingSigsMode missSigMode, byte[] expectedSig) throws Exception {
         // Check the wallet will write dummy scriptSigs for inputs that we have only pubkeys for without the privkey.
         ECKey priv = new ECKey();
-        ECKey pub = ECKey.fromPublicOnly(priv);
+        ECKey pub = ECKey.fromPublicOnly(priv.getPubKeyPoint());
         wallet.importKey(pub);
         ECKey priv2 = wallet.freshReceiveKey();
         // Send three transactions, with one being an address type and the other being a raw CHECKSIG type pubkey only,
