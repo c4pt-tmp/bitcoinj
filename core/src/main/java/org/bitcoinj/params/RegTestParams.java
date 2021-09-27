@@ -30,38 +30,17 @@ public class RegTestParams extends AbstractBitcoinNetParams {
     private static final BigInteger MAX_TARGET = new BigInteger("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16);
 
     public RegTestParams() {
-        super();
-        packetMagic = 0xfabfb5daL;
-        addressHeader = 111;
-        p2shHeader = 196;
-        targetTimespan = TARGET_TIMESPAN;
-        dumpedPrivateKeyHeader = 239;
-        segwitAddressHrp = "rart";
-        genesisBlock.setTime(1296688602L);
-        genesisBlock.setDifficultyTarget(0x207fffffL);
-        genesisBlock.setNonce(384568319);
-        spendableCoinbaseDepth = 100;
-        String genesisHash = genesisBlock.getHashAsString();
-        checkState(genesisHash.equals("1b38af7fac04373a2619b6f0e8f2fc73f45380fb98bef338b41fb64e893b9cd2"));
-        dnsSeeds = null;
-        addrSeeds = null;
-        bip32HeaderP2PKHpub = 0x043587cf; // The 4 byte header that serializes in base58 to "tpub".
-        bip32HeaderP2PKHpriv = 0x04358394; // The 4 byte header that serializes in base58 to "tprv"
-        bip32HeaderP2WPKHpub = 0x045f1cf6; // The 4 byte header that serializes in base58 to "vpub".
-        bip32HeaderP2WPKHpriv = 0x045f18bc; // The 4 byte header that serializes in base58 to "vprv"
-
+super();
         // Difficulty adjustments are disabled for regtest.
-        // By setting the block interval for difficulty adjustments to Integer.MAX_VALUE we make sure difficulty never
-        // changes.
+        // By setting the block interval for difficulty adjustments to Integer.MAX_VALUE we make sure difficulty never changes.
         interval = Integer.MAX_VALUE;
         maxTarget = MAX_TARGET;
         subsidyDecreaseBlockCount = 150;
         port = 18444;
         id = ID_REGTEST;
-
-        majorityEnforceBlockUpgrade = MainNetParams.MAINNET_MAJORITY_ENFORCE_BLOCK_UPGRADE;
-        majorityRejectBlockOutdated = MainNetParams.MAINNET_MAJORITY_REJECT_BLOCK_OUTDATED;
-        majorityWindow = MainNetParams.MAINNET_MAJORITY_WINDOW;
+        packetMagic = 0xfabfb5da;
+        addressHeader = 111;
+        dumpedPrivateKeyHeader = 239;
     }
 
     @Override
@@ -77,14 +56,18 @@ public class RegTestParams extends AbstractBitcoinNetParams {
             if (genesis == null) {
                 genesis = super.getGenesisBlock();
                 genesis.setNonce(2);
-                genesis.setDifficultyTarget(0x207fFFFFL);
+                genesis.setDifficultyTarget(0x207fffffL);
                 genesis.setTime(1296688602L);
+                checkState(genesis.getVersion() == 1);
+                checkState(genesis.getHashAsString().toLowerCase().equals("1b38af7fac04373a2619b6f0e8f2fc73f45380fb98bef338b41fb64e893b9cd2"));
+                genesis.verifyHeader();
             }
             return genesis;
         }
     }
 
     private static RegTestParams instance;
+
     public static synchronized RegTestParams get() {
         if (instance == null) {
             instance = new RegTestParams();
@@ -96,4 +79,23 @@ public class RegTestParams extends AbstractBitcoinNetParams {
     public String getPaymentProtocolId() {
         return PAYMENT_PROTOCOL_ID_REGTEST;
     }
+
+    @Override
+    /** the testnet rules don't work for regtest, where difficulty stays the same */
+    public long calculateNewDifficultyTarget(StoredBlock storedPrev, Block nextBlock, BlockStore blockStore)
+            throws VerificationException, BlockStoreException {
+        final Block prev = storedPrev.getHeader();
+        return prev.getDifficultyTarget();
+    }
+
+    @Override
+    public boolean allowMinDifficultyBlocks() {
+        return false;
+    }
+
+    @Override
+    public boolean isTestNet() {
+        return false;
+    }
 }
+
