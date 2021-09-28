@@ -144,7 +144,7 @@ public class BitcoinURI {
         // the & (%26) in Tom and Jerry gets interpreted as a separator and the label then gets parsed
         // as 'Tom ' instead of 'Tom & Jerry')
         String blockchainInfoScheme = scheme + "://";
-        String correctScheme = scheme + ":";
+        String correctScheme = scheme + "";
         String schemeSpecificPart;
         final String inputLc = input.toLowerCase(Locale.US);
         if (inputLc.startsWith(blockchainInfoScheme)) {
