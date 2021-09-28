@@ -373,7 +373,7 @@ public class BitcoinURI {
         
         StringBuilder builder = new StringBuilder();
         String scheme = params.getUriScheme();
-        builder.append(scheme).append(":").append(address);
+        builder.append(scheme).append("").append(address);
         
         boolean questionMarkHasBeenOutput = false;
         
