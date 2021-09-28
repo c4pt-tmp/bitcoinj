@@ -52,7 +52,7 @@ public abstract class NetworkParameters {
     public static final byte[] SATOSHI_KEY = Utils.HEX.decode("046b8e36534122449a1d0c0c2b380647b23b562fb0be95b698596a2507eb6aa5c5dba4294bc39f31b3b2351994673ce150449ad83bce4b7624b7c488f6ca23aa71");
 
     /** The string returned by getId() for the main, production network where people trade things. */
-    public static final String ID_MAINNET = "org.radiocoin.production";
+    public static final String ID_MAINNET = "org.bitcoin.production";
     /** The string returned by getId() for the testnet. */
     public static final String ID_TESTNET = "org.bitcoin.test";
     /** The string returned by getId() for regtest mode. */
@@ -501,7 +501,7 @@ public abstract class NetworkParameters {
         BLOOM_FILTER_BIP111(70011), // BIP111
         WITNESS_VERSION(70012),
         FEEFILTER(70013), // BIP133
-        CURRENT(70015);
+        CURRENT(70003);
 
         private final int bitcoinProtocol;
 
