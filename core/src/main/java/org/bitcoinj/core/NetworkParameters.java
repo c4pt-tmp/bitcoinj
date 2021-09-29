@@ -52,9 +52,9 @@ public abstract class NetworkParameters {
     public static final byte[] SATOSHI_KEY = Utils.HEX.decode("046b8e36534122449a1d0c0c2b380647b23b562fb0be95b698596a2507eb6aa5c5dba4294bc39f31b3b2351994673ce150449ad83bce4b7624b7c488f6ca23aa71");
 
     /** The string returned by getId() for the main, production network where people trade things. */
-    public static final String ID_MAINNET = "org.bitcoin.production";
+    public static final String ID_MAINNET = "org.dogecoin.production";
     /** The string returned by getId() for the testnet. */
-    public static final String ID_TESTNET = "org.bitcoin.test";
+    public static final String ID_TESTNET = "org.dogecoin.test";
     /** The string returned by getId() for regtest mode. */
     public static final String ID_REGTEST = "org.bitcoin.regtest";
     /** Unit test network. */
@@ -128,7 +128,7 @@ public abstract class NetworkParameters {
             Script.writeBytes(scriptPubKeyBytes, Utils.HEX.decode
                     ("046b8e36534122449a1d0c0c2b380647b23b562fb0be95b698596a2507eb6aa5c5dba4294bc39f31b3b2351994673ce150449ad83bce4b7624b7c488f6ca23aa71"));
             scriptPubKeyBytes.write(ScriptOpCodes.OP_CHECKSIG);
-            t.addOutput(new TransactionOutput(n, t, FIFTY_COINS, scriptPubKeyBytes.toByteArray()));
+            t.addOutput(new TransactionOutput(n, t,  COIN.multiply(88),  scriptPubKeyBytes.toByteArray()));
         } catch (Exception e) {
             // Cannot happen.
             throw new RuntimeException(e);
@@ -137,7 +137,7 @@ public abstract class NetworkParameters {
         return genesisBlock;
     }
 
-    public static final int TARGET_TIMESPAN = 4 * 24 * 60 * 60;  // 2 weeks per difficulty cycle, on average.
+    public static final int TARGET_TIMESPAN = 4 * 60 * 60;  // 2 weeks per difficulty cycle, on average.
     public static final int TARGET_SPACING = 60;  // 10 minutes per block.
     public static final int INTERVAL = TARGET_TIMESPAN / TARGET_SPACING;
     
@@ -146,12 +146,19 @@ public abstract class NetworkParameters {
      * network rules in a soft-forking manner, that is, blocks that don't follow the rules are accepted but not
      * mined upon and thus will be quickly re-orged out as long as the majority are enforcing the rule.
      */
-    public static final int BIP16_ENFORCE_TIME = 1333238400;
+  //  public static final int BIP16_ENFORCE_TIME = 1333238400;
+      public static final int BIP16_ENFORCE_TIME = 0;
     
     /**
      * The maximum number of coins to be generated
      */
-    public static final long MAX_COINS = 100000000;
+    public static const CAmount COIN = 100000000;
+   // public static const CAmount CENT = 1000000;
+    
+    
+    public static const CAmount MAX_COINS = 10000000000 * COIN;
+    
+    //public static final long MAX_COINS = 100000000;
 
     /**
      * The maximum money to be generated
