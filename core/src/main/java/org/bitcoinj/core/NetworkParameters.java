@@ -154,7 +154,7 @@ public abstract class NetworkParameters {
      
                          
      */                             
-    public static final long COIN = 10000;    
+    public static final long COIN = 1000;    
     
     public static final long MAX_COINS = 100000000 * COIN;
 
