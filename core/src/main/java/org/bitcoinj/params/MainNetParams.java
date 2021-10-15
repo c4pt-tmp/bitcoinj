@@ -37,26 +37,32 @@ public class MainNetParams extends AbstractBitcoinNetParams {
         super();
         interval = INTERVAL;
         targetTimespan = TARGET_TIMESPAN;
-        maxTarget = Utils.decodeCompactBits(0x1e0ffff0L);
+        maxTarget = Utils.decodeCompactBits(0x1e7fffffL);
         
         
         
+        dumpedPrivateKeyHeader = 196; //This is always addressHeader + 128
+        addressHeader = 68;
+        p2shHeader = 115;
         
+        port = 8235;
+
+packetMagic = 0xf9d9cdc3;
+
         
-         dumpedPrivateKeyHeader = 158; //This is always addressHeader + 128
-        addressHeader = 60;
-        p2shHeader = 22;
-        port = 8333;
-        packetMagic = 0xd1d1d1d1;
+         bip32HeaderP2PKHpub = 0x0488b21e; //The 4 byte header that serializes in base58 to "dgub".
+        bip32HeaderP2PKHpriv =  0x0488ade4; 
+
+       // packetMagic = 0xd1d1d1d1;
         //segwitAddressHrp = "radc";
         // Note that while BIP44 makes HD wallets chain-agnostic, for legacy
         // reasons we use a Doge-specific header for main net. At some point
         // we'll add independent headers for BIP32 legacy and BIP44.
-        bip32HeaderP2PKHpub = 0x02facafd; //The 4 byte header that serializes in base58 to "dgub".
-        bip32HeaderP2PKHpriv =  0x02fac398; //The 4 byte header that serializes in base58 to "dgpv".
-        genesisBlock.setDifficultyTarget(0x1e0ffff0L);
-        genesisBlock.setTime(1622171724L);
-        genesisBlock.setNonce(491158L);
+        //bip32HeaderP2PKHpub = 0x02facafd; //The 4 byte header that serializes in base58 to "dgub".
+       // bip32HeaderP2PKHpriv =  0x02fac398; //The 4 byte header that serializes in base58 to "dgpv".
+        genesisBlock.setDifficultyTarget(0x1e7fffffL);
+	genesisBlock.setTime(1524198159L);
+        genesisBlock.setNonce(261378L);
         id = ID_MAINNET;
         subsidyDecreaseBlockCount = 100000;
         spendableCoinbaseDepth = 10;
@@ -64,7 +70,7 @@ public class MainNetParams extends AbstractBitcoinNetParams {
         // Note this is an SHA256 hash, not a Scrypt hash. Scrypt hashes are only
         // used in difficulty calculations.
         String genesisHash = genesisBlock.getHashAsString();
-        checkState(genesisHash.equals("000007ce46e6c59844c34fa7ba5b27c8dac0653a27fcfb7340cc0158849e4afd"),
+        checkState(genesisHash.equals("6be1ade2619d1402571996e436b726c8b0bd72f10fdcae10cff5acd369118626"),
                 genesisHash);
         
         
@@ -75,7 +81,8 @@ public class MainNetParams extends AbstractBitcoinNetParams {
         // transactions are handled. Duplicated transactions could occur in the case where a coinbase had the same
         // extraNonce and the same outputs but appeared at different heights, and greatly complicated re-org handling.
         // Having these here simplifies block connection logic considerably.
-        checkpoints.put(60000, Sha256Hash.wrap("cf23fe03d921012cfdfc2847bd6ef4a647bbb559d6eb57d6432d7bcb930d720f"));
+
+        checkpoints.put(300000, Sha256Hash.wrap("05afa15162271b7b03d950b04df8f6a8429c696d53601e7163df4fc5514564f5"));
 
         
         
