@@ -49,7 +49,7 @@ public abstract class NetworkParameters {
     /**
      * The alert signing key originally owned by Satoshi, and now passed on to Gavin along with a few others.
      */
-    public static final byte[] SATOSHI_KEY = Utils.HEX.decode("046b8e36534122449a1d0c0c2b380647b23b562fb0be95b698596a2507eb6aa5c5dba4294bc39f31b3b2351994673ce150449ad83bce4b7624b7c488f6ca23aa71");
+    public static final byte[] SATOSHI_KEY = Utils.HEX.decode("04584ca4018adf8b6b26edb1d2ac869a3ad91f8b92c1d93a89bd7c2142a5f42332a3896625ca5acb660004d4a07d73ec46b456e494cca331e7f3cfb12e0af68538");
 
     /** The string returned by getId() for the main, production network where people trade things. */
     public static final String ID_MAINNET = "org.bitcoin.production";
@@ -122,13 +122,13 @@ public abstract class NetworkParameters {
             //
             //   "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
             byte[] bytes = Utils.HEX.decode
-                    ("04f0ff0f1e010410526164696f436f696e2077616c6c6574");
+                    ("04ffff7f1e0104465572616e69756d582032302f417072696c2f3230313820526164696f61637469766520426c6f636b636861696e20446973636f766572656420696e2044656570205370616365");
             t.addInput(new TransactionInput(n, t, bytes));
             ByteArrayOutputStream scriptPubKeyBytes = new ByteArrayOutputStream();
             Script.writeBytes(scriptPubKeyBytes, Utils.HEX.decode
-                    ("046b8e36534122449a1d0c0c2b380647b23b562fb0be95b698596a2507eb6aa5c5dba4294bc39f31b3b2351994673ce150449ad83bce4b7624b7c488f6ca23aa71"));
+                    ("04584ca4018adf8b6b26edb1d2ac869a3ad91f8b92c1d93a89bd7c2142a5f42332a3896625ca5acb660004d4a07d73ec46b456e494cca331e7f3cfb12e0af68538"));
             scriptPubKeyBytes.write(ScriptOpCodes.OP_CHECKSIG);
-            t.addOutput(new TransactionOutput(n, t,  COIN.multiply(88),  scriptPubKeyBytes.toByteArray()));
+            t.addOutput(new TransactionOutput(n, t,  COIN.multiply(1),  scriptPubKeyBytes.toByteArray()));
         } catch (Exception e) {
             // Cannot happen.
             throw new RuntimeException(e);
@@ -137,8 +137,8 @@ public abstract class NetworkParameters {
         return genesisBlock;
     }
 
-    public static final int TARGET_TIMESPAN = 4 * 60 * 60;  // 2 weeks per difficulty cycle, on average.
-    public static final int TARGET_SPACING = 60;  // 10 minutes per block.
+    public static final int TARGET_TIMESPAN = 7 * 24 * 60 * 60;  // 2 weeks per difficulty cycle, on average.
+    public static final int TARGET_SPACING = 5 * 60;  // 10 minutes per block.
     public static final int INTERVAL = TARGET_TIMESPAN / TARGET_SPACING;
     
     /**
